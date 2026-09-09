@@ -24,11 +24,19 @@
     --spine-deep: #3B2640;
     --brass: #B8863A;
     --brass-bg: #F1E2C4;
-    --leather: #8C5A3A;
-    --leather-bg: #F0DDC8;
     --rust: #A6483B;
     --line: #E0CCD1;
     --shadow: 0 2px 10px rgba(43,34,48,0.08);
+    --tag-red: #B14A3D;
+    --tag-red-bg: #F5DBD7;
+    --tag-yellow: #8A6A1D;
+    --tag-yellow-bg: #F8ECC6;
+    --tag-green: #3F7A4E;
+    --tag-green-bg: #DCEBDD;
+    --tag-blue: #3A5F8C;
+    --tag-blue-bg: #DCE6F2;
+    --tag-violet: #6F4FA0;
+    --tag-violet-bg: #EBE1F7;
   }
   *{box-sizing:border-box;}
   html, body{
@@ -303,6 +311,97 @@
   .star-filled{ color:var(--brass); }
   .star-empty{ color:var(--line); }
 
+  /* Month grouping */
+  .month-group{ margin-bottom:4px; }
+  .month-header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin:20px 2px 10px;
+  }
+  .month-group:first-child .month-header{ margin-top:2px; }
+  .month-header .month-name{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:15px;
+    color:var(--ink);
+  }
+  .month-header .month-count{
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
+
+  /* Grid view */
+  .book-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:14px 10px;
+    margin-bottom:6px;
+  }
+  .grid-tile{
+    cursor:pointer;
+    text-align:center;
+  }
+  .grid-tile:focus-visible{ outline:2px solid var(--spine); outline-offset:3px; border-radius:8px; }
+  .grid-cover-wrap{
+    position:relative;
+  }
+  .grid-cover, .grid-cover-placeholder{
+    width:100%;
+    aspect-ratio: 3 / 4.2;
+    border-radius:8px;
+    box-shadow: var(--shadow);
+  }
+  .grid-cover{ object-fit:cover; }
+  .grid-cover-placeholder{
+    background:linear-gradient(160deg, var(--spine), var(--spine-deep));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:22px;
+  }
+  .grid-dot.owner{
+    position:absolute;
+    top:6px;
+    right:6px;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    border:2px solid var(--card);
+  }
+  .grid-dot.owner.owned{ background:var(--tag-blue); }
+  .grid-dot.owner.borrowed{ background:var(--tag-violet); }
+  .grid-title{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:12px;
+    line-height:1.25;
+    margin-top:7px;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .grid-dots{
+    display:flex;
+    justify-content:center;
+    gap:5px;
+    margin-top:5px;
+  }
+  .grid-dot.status{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+  }
+  .grid-dot.status.to-read{ background:var(--tag-red); }
+  .grid-dot.status.reading{ background:var(--tag-yellow); }
+  .grid-dot.status.done{ background:var(--tag-green); }
+  .grid-stars{
+    justify-content:center;
+    display:flex;
+    margin-top:4px;
+  }
+
   .pill-row{
     display:flex;
     gap:6px;
@@ -318,11 +417,11 @@
     align-items:center;
     gap:4px;
   }
-  .pill.status-to-read{ background:#ECD9D3; color:var(--ink-soft); }
-  .pill.status-reading{ background:var(--spine); color:#fff; }
-  .pill.status-done{ background:var(--leather-bg); color:var(--leather); }
-  .pill.owned{ background:#EDE2EC; color:var(--spine-deep); }
-  .pill.borrowed{ background:var(--brass-bg); color:var(--brass); }
+  .pill.status-to-read{ background:var(--tag-red-bg); color:var(--tag-red); }
+  .pill.status-reading{ background:var(--tag-yellow-bg); color:var(--tag-yellow); }
+  .pill.status-done{ background:var(--tag-green-bg); color:var(--tag-green); }
+  .pill.owned{ background:var(--tag-blue-bg); color:var(--tag-blue); }
+  .pill.borrowed{ background:var(--tag-violet-bg); color:var(--tag-violet); }
   .pill .dot{ width:5px;height:5px;border-radius:50%;background:currentColor; }
 
   .action-row{
@@ -349,13 +448,13 @@
     color:#fff;
     border-color:var(--spine);
   }
-  .btn.ghost-brass{
-    background:var(--brass-bg);
-    color:var(--brass);
+  .btn.tag-owner-btn{
+    background:var(--tag-blue-bg);
+    color:var(--tag-blue);
     border-color:transparent;
   }
-  .btn.ghost-brass.active{
-    background:var(--brass);
+  .btn.tag-owner-btn.active{
+    background:var(--tag-violet);
     color:#fff;
   }
   .finished-note{
@@ -363,6 +462,70 @@
     color:var(--ink-soft);
     margin-top:8px;
   }
+
+  /* Wishlist (buy list) cards */
+  .wish-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 15px;
+    margin-bottom:11px;
+    box-shadow: var(--shadow);
+  }
+  .wish-title{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:16.5px;
+    line-height:1.25;
+  }
+  .wish-author{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+  .wish-publisher{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    font-style:italic;
+    margin-top:2px;
+  }
+  .wish-card .action-row{ margin-top:11px; }
+
+  /* Loan cards (Lent tab) */
+  .loan-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 15px;
+    margin-bottom:11px;
+    box-shadow: var(--shadow);
+  }
+  .loan-card.returned{
+    opacity:0.55;
+    box-shadow:none;
+  }
+  .loan-title{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:16.5px;
+    line-height:1.25;
+  }
+  .loan-author{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+  .loan-person{
+    font-size:13.5px;
+    margin-top:8px;
+  }
+  .loan-person strong{ font-weight:700; }
+  .loan-date{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:3px;
+  }
+  .loan-card .action-row{ margin-top:11px; }
 
   /* Empty state */
   .empty{
@@ -577,6 +740,22 @@
     color:var(--ink);
     resize:vertical;
     min-height:66px;
+  }
+  .field select{
+    width:100%;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:10px;
+    padding:10px 12px;
+    font-family:inherit;
+    font-size:13.5px;
+    color:var(--ink);
+  }
+  .field select:disabled{ color:var(--ink-soft); }
+  .lend-author-preview{
+    font-size:13.5px;
+    color:var(--ink-soft);
+    padding:2px 0;
   }
   .sheet-actions{
     display:flex;
@@ -896,6 +1075,8 @@
   <nav class="tabbar">
     <button data-tab="library" class="active"><span class="tab-glyph">📖</span>Library</button>
     <button data-tab="progress"><span class="tab-glyph">📈</span>Progress</button>
+    <button data-tab="wishlist"><span class="tab-glyph">🛒</span>List</button>
+    <button data-tab="lent"><span class="tab-glyph">🤝</span>Lent</button>
   </nav>
 
   <div class="sheet-backdrop" id="sheetBackdrop">
@@ -1031,12 +1212,58 @@
     </div>
   </div>
 
+  <div class="sheet-backdrop" id="wishSheetBackdrop">
+    <div class="sheet">
+      <h2>Add to your list</h2>
+      <div class="field">
+        <label for="wTitle">Title <span class="req">*</span></label>
+        <input type="text" id="wTitle" placeholder="The Left Hand of Darkness">
+      </div>
+      <div class="field">
+        <label for="wAuthor">Author <span class="req">*</span></label>
+        <input type="text" id="wAuthor" placeholder="Ursula K. Le Guin">
+      </div>
+      <div class="field">
+        <label for="wPublisher">Publisher (optional)</label>
+        <input type="text" id="wPublisher" placeholder="Ace Books">
+      </div>
+      <div class="sheet-actions">
+        <button class="btn" id="wishCancelBtn">Cancel</button>
+        <button class="btn primary" id="wishSaveBtn">Add to list</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="lendSheetBackdrop">
+    <div class="sheet">
+      <h2>Lend a book</h2>
+      <div class="field">
+        <label for="lendBookSelect">Book</label>
+        <select id="lendBookSelect"></select>
+      </div>
+      <div class="field" id="lendAuthorPreviewField" style="display:none;">
+        <label>Author</label>
+        <div class="lend-author-preview" id="lendAuthorPreview"></div>
+      </div>
+      <div class="field">
+        <label for="lendPerson">Lent to <span class="req">*</span></label>
+        <input type="text" id="lendPerson" placeholder="Friend's name">
+      </div>
+      <div class="sheet-actions">
+        <button class="btn" id="lendCancelBtn">Cancel</button>
+        <button class="btn primary" id="lendSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
 (function(){
   const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let books = [];
+  let wishlist = []; // books the user wants to buy in the future
+  let loans = []; // books the user has lent out to other people
   let currentTab = 'library';
   let view = 'library'; // 'library' | 'progress' | 'detail'
   let selectedBookId = null;
@@ -1045,6 +1272,7 @@
   let ratingFilters = new Set();   // 1-5
   let searchTerm = '';
   let sortDir = 'desc'; // 'desc' = recent first, 'asc' = oldest first
+  let libraryViewMode = 'list'; // 'list' | 'grid'
   let progressPeriod = 'month';
   let progressYear = new Date().getFullYear();
   let progressMonth = new Date().getMonth(); // 0-11, used by the Month period view
@@ -1071,6 +1299,7 @@
   }
 
   const STORAGE_KEY = 'leebrary_books_v1';
+  const WISHLIST_STORAGE_KEY = 'leebrary_wishlist_v1';
 
   async function loadBooks(){
     try{
@@ -1083,6 +1312,37 @@
   async function saveBooks(){
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+    }catch(e){
+      console.error('Could not save', e);
+    }
+  }
+  async function loadWishlist(){
+    try{
+      const raw = localStorage.getItem(WISHLIST_STORAGE_KEY);
+      wishlist = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      wishlist = [];
+    }
+  }
+  async function saveWishlist(){
+    try{
+      localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(wishlist));
+    }catch(e){
+      console.error('Could not save', e);
+    }
+  }
+  const LOANS_STORAGE_KEY = 'leebrary_loans_v1';
+  async function loadLoans(){
+    try{
+      const raw = localStorage.getItem(LOANS_STORAGE_KEY);
+      loans = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      loans = [];
+    }
+  }
+  async function saveLoans(){
+    try{
+      localStorage.setItem(LOANS_STORAGE_KEY, JSON.stringify(loans));
     }catch(e){
       console.error('Could not save', e);
     }
@@ -1147,6 +1407,37 @@
     });
   }
 
+  function nowMonthKey(){
+    const now = new Date();
+    return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  }
+  function monthKeyLabel(key){
+    const [y, m] = key.split('-').map(Number);
+    return new Date(y, m-1, 1).toLocaleDateString(undefined, {month:'long', year:'numeric'});
+  }
+  function monthKeyFor(b){
+    // Done books are grouped by the month they were actually finished (most recent
+    // completion, if reread). Anything still to-read/reading has no finish date yet,
+    // so it belongs with "what I'm working on right now" — the current month —
+    // rather than whatever month it happened to be added to the app.
+    if(b.status === 'done'){
+      const dates = getReadDates(b);
+      const last = dates.length ? dates[dates.length-1] : '';
+      if(last) return last.slice(0, 7);
+    }
+    return nowMonthKey();
+  }
+  function groupBooksByMonth(list){
+    const groups = new Map();
+    list.forEach(b=>{
+      const key = monthKeyFor(b);
+      if(!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(b);
+    });
+    const keys = Array.from(groups.keys()).sort((a,b)=> sortDir==='desc' ? b.localeCompare(a) : a.localeCompare(b));
+    return keys.map(k=>({ key:k, label: monthKeyLabel(k), books: groups.get(k) }));
+  }
+
   function renderLibrary(){
     const main = document.getElementById('main');
     const filtered = filteredBooks();
@@ -1164,6 +1455,11 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 4 20 4 14 12 14 19 10 21 10 12 4 4"></polygon></svg>
         ${badge > 0 ? `<span class="filter-badge">${badge}</span>` : ''}
       </button>
+      <button class="filter-icon-btn" id="viewModeBtn" title="${libraryViewMode==='list' ? 'Switch to grid view' : 'Switch to list view'}">
+        ${libraryViewMode==='list'
+          ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>'
+          : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>'}
+      </button>
     </div>`;
     html += `<div class="sort-row">
       <span class="sort-label">Sort by ${sortField==='finished' ? 'done date' : 'added date'}</span>
@@ -1180,7 +1476,20 @@
         <div class="sub">${books.length===0 ? 'Tap the + button to add your first book.' : 'Try different filters or search.'}</div>
       </div>`;
     } else {
-      html += filtered.map(bookCard).join('');
+      const groups = groupBooksByMonth(filtered);
+      html += groups.map(g=>{
+        const count = g.books.length;
+        const body = libraryViewMode === 'grid'
+          ? `<div class="book-grid">${g.books.map(bookGridTile).join('')}</div>`
+          : g.books.map(bookCard).join('');
+        return `<div class="month-group">
+          <div class="month-header">
+            <span class="month-name">${escapeHtml(g.label)}</span>
+            <span class="month-count">${count} book${count===1?'':'s'}</span>
+          </div>
+          ${body}
+        </div>`;
+      }).join('');
     }
     main.innerHTML = html;
 
@@ -1200,11 +1509,34 @@
       });
     });
     document.getElementById('filterIconBtn').addEventListener('click', openFilters);
+    document.getElementById('viewModeBtn').addEventListener('click', ()=>{
+      libraryViewMode = (libraryViewMode === 'list') ? 'grid' : 'list';
+      renderLibrary();
+    });
     document.getElementById('sortDirBtn').addEventListener('click', ()=>{
       sortDir = (sortDir === 'desc') ? 'asc' : 'desc';
       renderLibrary();
     });
     bindBookCardEvents();
+  }
+
+  function bookGridTile(b){
+    const thumb = b.cover
+      ? `<img class="grid-cover" src="${b.cover}" alt="">`
+      : `<div class="grid-cover-placeholder">📕</div>`;
+    const stars = b.rating ? `<div class="stars-row small grid-stars">${starString(b.rating)}</div>` : '';
+    const statusDotClass = b.status === 'to-read' ? 'to-read' : (b.status === 'reading' ? 'reading' : 'done');
+    return `<div class="grid-tile" data-id="${b.id}" role="button" tabindex="0">
+      <div class="grid-cover-wrap">
+        ${thumb}
+        <span class="grid-dot owner ${b.borrowed?'borrowed':'owned'}" title="${b.borrowed?'Borrowed':'Owned'}"></span>
+      </div>
+      <div class="grid-title">${escapeHtml(b.title)}</div>
+      <div class="grid-dots">
+        <span class="grid-dot status ${statusDotClass}" title="${STATUS_LABELS[b.status]}"></span>
+      </div>
+      ${stars}
+    </div>`;
   }
 
   function bookCard(b){
@@ -1233,7 +1565,7 @@
   }
 
   function bindBookCardEvents(){
-    document.querySelectorAll('.book-card').forEach(card=>{
+    document.querySelectorAll('.book-card, .grid-tile').forEach(card=>{
       const openDetail = () => {
         selectedBookId = card.getAttribute('data-id');
         view = 'detail';
@@ -1283,6 +1615,18 @@
         </ul>
       </div>` : '';
 
+    const bookLoans = loans.filter(l=>l.bookId===b.id).sort((a,c)=> (c.dateLent||'').localeCompare(a.dateLent||''));
+    const lentSection = bookLoans.length ? `
+      <div class="detail-review">
+        <div class="section-label">Lent out</div>
+        <ul class="history-list">
+          ${bookLoans.map(l=> l.returned
+            ? `<li>${escapeHtml(l.personName)} — returned ${fmtDate(l.dateReturned)}</li>`
+            : `<li>${escapeHtml(l.personName)} — still out (lent ${fmtDate(l.dateLent)})</li>`
+          ).join('')}
+        </ul>
+      </div>` : '';
+
     let statusActions = '';
     if(b.status === 'to-read'){
       statusActions += `<button class="btn" data-action="start" data-id="${b.id}">Start reading</button>`;
@@ -1292,7 +1636,7 @@
     } else {
       statusActions += `<button class="btn" data-action="reopen" data-id="${b.id}">Reopen</button>`;
     }
-    statusActions += `<button class="btn ghost-brass${b.borrowed?' active':''}" data-action="toggle-borrowed" data-id="${b.id}">${b.borrowed?'Mark owned':'Mark borrowed'}</button>`;
+    statusActions += `<button class="btn tag-owner-btn${b.borrowed?' active':''}" data-action="toggle-borrowed" data-id="${b.id}">${b.borrowed?'Mark owned':'Mark borrowed'}</button>`;
 
     const backloggedFinish = b.dateFinished && b.dateAdded && b.dateFinished < b.dateAdded;
     const dates = backloggedFinish
@@ -1327,6 +1671,7 @@
       <div class="action-row">${statusActions}</div>
       ${review}
       ${historyList}
+      ${lentSection}
       <div class="detail-footer-actions">
         <button class="btn" data-action="share" data-id="${b.id}">Share</button>
         <button class="btn" data-action="edit" data-id="${b.id}">Edit</button>
@@ -1388,6 +1733,147 @@
         renderDetail();
       });
     });
+  }
+
+  // ---------- Rendering: Wishlist (buy list) ----------
+  function renderWishlist(){
+    const main = document.getElementById('main');
+    const list = wishlist.slice().sort((a,b)=> (b.dateAdded||'').localeCompare(a.dateAdded||''));
+
+    let html = '';
+    if(list.length === 0){
+      html += `<div class="empty">
+        <div class="glyph">🛒</div>
+        <div class="title">Your list is empty</div>
+        <div class="sub">Tap the + button to add a book you want to buy.</div>
+      </div>`;
+    } else {
+      html += list.map(wishCard).join('');
+    }
+    main.innerHTML = html;
+
+    main.querySelectorAll('[data-action]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const id = el.getAttribute('data-id');
+        const action = el.getAttribute('data-action');
+        const item = wishlist.find(w=>w.id===id);
+        if(!item) return;
+        if(action === 'buy'){
+          books.push({
+            id: uid(),
+            title: item.title,
+            author: item.author,
+            status: 'to-read',
+            borrowed: false,
+            cover: null,
+            rating: 0,
+            review: '',
+            dateAdded: todayStr(),
+            dateFinished: null,
+            readHistory: []
+          });
+          wishlist = wishlist.filter(w=>w.id!==id);
+          saveBooks();
+          saveWishlist();
+          renderWishlist();
+        }
+        if(action === 'remove'){
+          showConfirm(`Remove "${item.title}" from your list?`, {
+            confirmLabel: 'Remove',
+            onConfirm: ()=>{
+              wishlist = wishlist.filter(w=>w.id!==id);
+              saveWishlist();
+              renderWishlist();
+            }
+          });
+        }
+      });
+    });
+  }
+
+  function wishCard(w){
+    return `<div class="wish-card">
+      <div class="wish-title">${escapeHtml(w.title)}</div>
+      ${w.author ? `<div class="wish-author">${escapeHtml(w.author)}</div>` : ''}
+      ${w.publisher ? `<div class="wish-publisher">${escapeHtml(w.publisher)}</div>` : ''}
+      <div class="action-row">
+        <button class="btn primary" data-action="buy" data-id="${w.id}">Mark as bought</button>
+        <button class="btn danger-outline" data-action="remove" data-id="${w.id}">Remove</button>
+      </div>
+    </div>`;
+  }
+
+  // ---------- Rendering: Lent (books lent out to other people) ----------
+  function lendableBooks(){
+    // Only your own copies can be lent out, and only ones not already out with someone else.
+    const activeLoanBookIds = new Set(loans.filter(l=>!l.returned).map(l=>l.bookId));
+    return books.filter(b=> !b.borrowed && !activeLoanBookIds.has(b.id));
+  }
+
+  function renderLent(){
+    const main = document.getElementById('main');
+    const active = loans.filter(l=>!l.returned).sort((a,b)=> (b.dateLent||'').localeCompare(a.dateLent||''));
+    const returned = loans.filter(l=>l.returned).sort((a,b)=> (b.dateReturned||b.dateLent||'').localeCompare(a.dateReturned||a.dateLent||''));
+
+    let html = '';
+    if(active.length === 0 && returned.length === 0){
+      html += `<div class="empty">
+        <div class="glyph">🤝</div>
+        <div class="title">No loans yet</div>
+        <div class="sub">Tap the + button to note who you've lent a book to.</div>
+      </div>`;
+    } else {
+      if(active.length){
+        html += `<div class="section-label">Currently lent out</div>`;
+        html += active.map(loanCard).join('');
+      }
+      if(returned.length){
+        html += `<div class="section-label">Returned</div>`;
+        html += returned.map(loanCard).join('');
+      }
+    }
+    main.innerHTML = html;
+
+    main.querySelectorAll('[data-action]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const id = el.getAttribute('data-id');
+        const action = el.getAttribute('data-action');
+        const loan = loans.find(l=>l.id===id);
+        if(!loan) return;
+        if(action === 'return'){
+          loan.returned = true;
+          loan.dateReturned = todayStr();
+          saveLoans();
+          renderLent();
+        }
+        if(action === 'remove-loan'){
+          showConfirm(`Remove this loan record for "${loan.bookTitle}"?`, {
+            confirmLabel: 'Remove',
+            onConfirm: ()=>{
+              loans = loans.filter(l=>l.id!==id);
+              saveLoans();
+              renderLent();
+            }
+          });
+        }
+      });
+    });
+  }
+
+  function loanCard(l){
+    const statusText = l.returned
+      ? `Returned ${fmtDate(l.dateReturned)}`
+      : `Lent ${fmtDate(l.dateLent)}`;
+    return `<div class="loan-card${l.returned ? ' returned' : ''}">
+      <div class="loan-title">${escapeHtml(l.bookTitle)}</div>
+      ${l.bookAuthor ? `<div class="loan-author">${escapeHtml(l.bookAuthor)}</div>` : ''}
+      <div class="loan-person">Lent to <strong>${escapeHtml(l.personName)}</strong></div>
+      <div class="loan-date">${statusText}</div>
+      <div class="action-row">
+        ${l.returned ? '' : `<button class="btn primary" data-action="return" data-id="${l.id}">Mark as returned</button>`}
+        <button class="btn danger-outline" data-action="remove-loan" data-id="${l.id}">Remove</button>
+      </div>
+    </div>`;
   }
 
   // ---------- Rendering: Progress ----------
@@ -1584,9 +2070,13 @@
     document.querySelectorAll('nav.tabbar button').forEach(b=>{
       b.classList.toggle('active', b.getAttribute('data-tab')===currentTab);
     });
-    document.getElementById('fabAdd').style.display = (view === 'detail') ? 'none' : 'flex';
+    const fab = document.getElementById('fabAdd');
+    fab.style.display = (view === 'detail') ? 'none' : 'flex';
+    fab.title = (currentTab === 'wishlist') ? 'Add to your list' : (currentTab === 'lent') ? 'Lend a book' : 'Add a book';
     if(view === 'library') renderLibrary();
     else if(view === 'progress') renderProgress();
+    else if(view === 'wishlist') renderWishlist();
+    else if(view === 'lent') renderLent();
     else renderDetail();
   }
   document.querySelectorAll('nav.tabbar button').forEach(btn=>{
@@ -1719,7 +2209,11 @@
     });
   });
 
-  document.getElementById('fabAdd').addEventListener('click', ()=>openSheet());
+  document.getElementById('fabAdd').addEventListener('click', ()=>{
+    if(currentTab === 'wishlist') openWishSheet();
+    else if(currentTab === 'lent') openLendSheet();
+    else openSheet();
+  });
   document.getElementById('cancelSheet').addEventListener('click', closeSheet);
   sheetBackdrop.addEventListener('click', e=>{ if(e.target===sheetBackdrop) closeSheet(); });
 
@@ -1776,6 +2270,89 @@
     await saveBooks();
     closeSheet();
     renderMain();
+  });
+
+  // ---------- Wishlist ("Add to your list") sheet ----------
+  const wishSheetBackdrop = document.getElementById('wishSheetBackdrop');
+  function openWishSheet(){
+    document.getElementById('wTitle').value = '';
+    document.getElementById('wAuthor').value = '';
+    document.getElementById('wPublisher').value = '';
+    wishSheetBackdrop.classList.add('open');
+    setTimeout(()=>document.getElementById('wTitle').focus(), 50);
+  }
+  function closeWishSheet(){ wishSheetBackdrop.classList.remove('open'); }
+  document.getElementById('wishCancelBtn').addEventListener('click', closeWishSheet);
+  wishSheetBackdrop.addEventListener('click', e=>{ if(e.target===wishSheetBackdrop) closeWishSheet(); });
+  document.getElementById('wishSaveBtn').addEventListener('click', async ()=>{
+    const title = document.getElementById('wTitle').value.trim();
+    if(!title){ document.getElementById('wTitle').focus(); return; }
+    const author = document.getElementById('wAuthor').value.trim();
+    if(!author){ document.getElementById('wAuthor').focus(); return; }
+    const publisher = document.getElementById('wPublisher').value.trim();
+    wishlist.push({ id: uid(), title, author, publisher, dateAdded: todayStr() });
+    await saveWishlist();
+    closeWishSheet();
+    renderWishlist();
+  });
+
+  // ---------- Lend sheet ----------
+  const lendSheetBackdrop = document.getElementById('lendSheetBackdrop');
+  function updateLendAuthorPreview(){
+    const select = document.getElementById('lendBookSelect');
+    const book = books.find(b=>b.id===select.value);
+    const field = document.getElementById('lendAuthorPreviewField');
+    const preview = document.getElementById('lendAuthorPreview');
+    if(book && book.author){
+      preview.textContent = book.author;
+      field.style.display = 'block';
+    } else {
+      field.style.display = 'none';
+    }
+  }
+  function openLendSheet(){
+    const select = document.getElementById('lendBookSelect');
+    const eligible = lendableBooks();
+    if(eligible.length === 0){
+      select.innerHTML = '<option value="">No owned books available right now</option>';
+      select.disabled = true;
+    } else {
+      select.disabled = false;
+      select.innerHTML = eligible.map(b=>
+        `<option value="${b.id}">${escapeHtml(b.title)}${b.author ? ' — '+escapeHtml(b.author) : ''}</option>`
+      ).join('');
+    }
+    updateLendAuthorPreview();
+    document.getElementById('lendPerson').value = '';
+    lendSheetBackdrop.classList.add('open');
+    setTimeout(()=>{
+      if(!select.disabled) select.focus(); else document.getElementById('lendPerson').focus();
+    }, 50);
+  }
+  function closeLendSheet(){ lendSheetBackdrop.classList.remove('open'); }
+  document.getElementById('lendBookSelect').addEventListener('change', updateLendAuthorPreview);
+  document.getElementById('lendCancelBtn').addEventListener('click', closeLendSheet);
+  lendSheetBackdrop.addEventListener('click', e=>{ if(e.target===lendSheetBackdrop) closeLendSheet(); });
+  document.getElementById('lendSaveBtn').addEventListener('click', async ()=>{
+    const select = document.getElementById('lendBookSelect');
+    if(select.disabled || !select.value) return;
+    const book = books.find(b=>b.id===select.value);
+    if(!book) return;
+    const person = document.getElementById('lendPerson').value.trim();
+    if(!person){ document.getElementById('lendPerson').focus(); return; }
+    loans.push({
+      id: uid(),
+      bookId: book.id,
+      bookTitle: book.title,
+      bookAuthor: book.author,
+      personName: person,
+      dateLent: todayStr(),
+      returned: false,
+      dateReturned: null
+    });
+    await saveLoans();
+    closeLendSheet();
+    renderLent();
   });
 
   // ---------- Filters sheet ----------
@@ -1993,8 +2570,11 @@
 
     const paper = cssVar('--paper'), ink = cssVar('--ink'), inkSoft = cssVar('--ink-soft'),
           spine = cssVar('--spine'), spineDeep = cssVar('--spine-deep'),
-          leather = cssVar('--leather'), leatherBg = cssVar('--leather-bg'),
-          brass = cssVar('--brass'), brassBg = cssVar('--brass-bg');
+          tagRed = cssVar('--tag-red'), tagRedBg = cssVar('--tag-red-bg'),
+          tagYellow = cssVar('--tag-yellow'), tagYellowBg = cssVar('--tag-yellow-bg'),
+          tagGreen = cssVar('--tag-green'), tagGreenBg = cssVar('--tag-green-bg'),
+          tagBlue = cssVar('--tag-blue'), tagBlueBg = cssVar('--tag-blue-bg'),
+          tagViolet = cssVar('--tag-violet'), tagVioletBg = cssVar('--tag-violet-bg');
 
     ctx.fillStyle = paper;
     ctx.fillRect(0, 0, W, H);
@@ -2045,11 +2625,11 @@
 
     const statusLabel = STATUS_LABELS[b.status];
     const pills = [];
-    if(b.status === 'to-read') pills.push({text: statusLabel, bg:'#ECD9D3', fg: inkSoft});
-    else if(b.status === 'reading') pills.push({text: statusLabel, bg: spine, fg:'#fff'});
-    else pills.push({text: statusLabel, bg: leatherBg, fg: leather});
-    if(b.borrowed) pills.push({text:'Borrowed', bg: brassBg, fg: brass});
-    else pills.push({text:'Owned', bg:'#EDE2EC', fg: spineDeep});
+    if(b.status === 'to-read') pills.push({text: statusLabel, bg: tagRedBg, fg: tagRed});
+    else if(b.status === 'reading') pills.push({text: statusLabel, bg: tagYellowBg, fg: tagYellow});
+    else pills.push({text: statusLabel, bg: tagGreenBg, fg: tagGreen});
+    if(b.borrowed) pills.push({text:'Borrowed', bg: tagVioletBg, fg: tagViolet});
+    else pills.push({text:'Owned', bg: tagBlueBg, fg: tagBlue});
     drawPillsRow(ctx, pills, W/2, cursorY, 26);
     cursorY += 66;
 
@@ -2274,6 +2854,8 @@
   // ---------- Init ----------
   (async function init(){
     await loadBooks();
+    await loadWishlist();
+    await loadLoans();
     renderMain();
     setupHomeScreenManifest();
   })();
