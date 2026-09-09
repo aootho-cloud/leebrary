@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Leebrary — Reading Tracker</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Leebrary">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#5B3A5C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -65,6 +70,20 @@
   header .tagline{
     font-size:11.5px;
     color:var(--ink-soft);
+  }
+  .header-icon-btn{
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink-soft);
+    width:38px;
+    height:38px;
+    border-radius:11px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+    align-self:center;
   }
 
   main{
@@ -825,6 +844,20 @@
   .share-progress-btn{
     margin-top:14px;
   }
+  .settings-desc{
+    font-size:13px;
+    line-height:1.55;
+    color:var(--ink-soft);
+    margin:0 0 20px;
+  }
+  .settings-action-btn{
+    display:block;
+    width:100%;
+    padding:12px;
+    text-align:center;
+    margin-bottom:10px;
+    font-size:14px;
+  }
   .detail-footer-actions{
     display:flex;
     gap:10px;
@@ -841,6 +874,12 @@
       <div class="brand"><span class="script">Lee</span>brary</div>
       <div class="tagline">a library that remembers</div>
     </div>
+    <button class="header-icon-btn" id="settingsBtn" title="Backup & restore">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
   </header>
 
   <main id="main"></main>
@@ -968,6 +1007,19 @@
       <div class="sheet-actions">
         <button class="btn" id="shareCloseBtn">Close</button>
         <a class="btn primary" id="shareDownloadBtn" download>Download image</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="settingsBackdrop">
+    <div class="sheet">
+      <h2>Backup & restore</h2>
+      <p class="settings-desc">Your library is saved only in this browser. To use it somewhere else — another browser, or your phone as well as a computer — export a backup file here, then import it there. Importing adds any books not already in your library; it won't duplicate ones that are.</p>
+      <button class="btn primary settings-action-btn" id="exportDataBtn">Export backup file</button>
+      <button class="btn settings-action-btn" id="importDataBtn">Import backup file</button>
+      <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
+      <div class="sheet-actions">
+        <button class="btn" id="closeSettingsBtn" style="flex:1;">Close</button>
       </div>
     </div>
   </div>
@@ -2113,10 +2165,141 @@
     }, 'image/png');
   }
 
+  // ---------- Settings: backup & restore ----------
+  const settingsBackdrop = document.getElementById('settingsBackdrop');
+  const importFileInput = document.getElementById('importFileInput');
+
+  document.getElementById('settingsBtn').addEventListener('click', ()=>{
+    settingsBackdrop.classList.add('open');
+  });
+  document.getElementById('closeSettingsBtn').addEventListener('click', ()=>{
+    settingsBackdrop.classList.remove('open');
+  });
+  settingsBackdrop.addEventListener('click', e=>{
+    if(e.target===settingsBackdrop) settingsBackdrop.classList.remove('open');
+  });
+
+  document.getElementById('exportDataBtn').addEventListener('click', ()=>{
+    const payload = { app:'leebrary', version:1, exportedAt: todayStr(), books };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `leebrary-backup-${todayStr()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  });
+
+  document.getElementById('importDataBtn').addEventListener('click', ()=> importFileInput.click());
+  importFileInput.addEventListener('change', ()=>{
+    const file = importFileInput.files && importFileInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      importFileInput.value = '';
+      let incoming;
+      try{
+        const parsed = JSON.parse(reader.result);
+        incoming = Array.isArray(parsed) ? parsed : parsed.books;
+        if(!Array.isArray(incoming)) throw new Error('not an array');
+      }catch(e){
+        showConfirm('That file could not be read as a Leebrary backup.', { confirmLabel:'OK', cancelLabel:null });
+        return;
+      }
+      const existingIds = new Set(books.map(b=>b.id));
+      const newOnes = incoming.filter(b=> b && b.id && b.title && !existingIds.has(b.id));
+      const skipped = incoming.length - newOnes.length;
+      const summary = `Found ${incoming.length} book${incoming.length===1?'':'s'} in that file — ${newOnes.length} new, ${skipped} already in your library. Import the ${newOnes.length} new one${newOnes.length===1?'':'s'}?`;
+      if(newOnes.length === 0){
+        showConfirm(`All ${incoming.length} book${incoming.length===1?'':'s'} in that file are already in your library — nothing new to import.`, { confirmLabel:'OK', cancelLabel:null });
+        return;
+      }
+      showConfirm(summary, {
+        confirmLabel: 'Import',
+        onConfirm: async ()=>{
+          newOnes.forEach(b=> books.push(b));
+          await saveBooks();
+          settingsBackdrop.classList.remove('open');
+          renderMain();
+        }
+      });
+    };
+    reader.onerror = ()=>{
+      showConfirm('That file could not be read.', { confirmLabel:'OK', cancelLabel:null });
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- Home screen icon & manifest ----------
+  // Built at runtime (rather than baked into the HTML) so the emoji glyph renders
+  // with the device's own color emoji font. Non-critical: if anything here fails,
+  // the app still works fine — it just won't have a custom home-screen icon.
+  function generateAppIconDataURL(size){
+    try{
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const spine = cssVar('--spine') || '#5B3A5C';
+      const spineDeep = cssVar('--spine-deep') || '#3B2640';
+      const grad = ctx.createLinearGradient(0, 0, size, size);
+      grad.addColorStop(0, spine);
+      grad.addColorStop(1, spineDeep);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `${Math.round(size*0.52)}px sans-serif`;
+      ctx.fillText('📖', size/2, size/2 + size*0.02);
+      return canvas.toDataURL('image/png');
+    }catch(e){
+      return null;
+    }
+  }
+  function setupHomeScreenMeta(){
+    try{
+      const icon512 = generateAppIconDataURL(512);
+      const icon192 = generateAppIconDataURL(192);
+      if(!icon512 || !icon192) return;
+
+      const appleIcon = document.createElement('link');
+      appleIcon.rel = 'apple-touch-icon';
+      appleIcon.href = icon192;
+      document.head.appendChild(appleIcon);
+
+      const favicon = document.createElement('link');
+      favicon.rel = 'icon';
+      favicon.href = icon192;
+      document.head.appendChild(favicon);
+
+      const manifest = {
+        name: 'Leebrary',
+        short_name: 'Leebrary',
+        start_url: '.',
+        display: 'standalone',
+        background_color: cssVar('--paper') || '#F1E7E9',
+        theme_color: cssVar('--spine') || '#5B3A5C',
+        icons: [
+          { src: icon192, sizes: '192x192', type: 'image/png' },
+          { src: icon512, sizes: '512x512', type: 'image/png' }
+        ]
+      };
+      const manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = URL.createObjectURL(manifestBlob);
+      document.head.appendChild(manifestLink);
+    }catch(e){
+      // Non-critical — ignore.
+    }
+  }
+
   // ---------- Init ----------
   (async function init(){
     await loadBooks();
     renderMain();
+    setupHomeScreenMeta();
   })();
 })();
 </script>
