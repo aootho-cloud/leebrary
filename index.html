@@ -171,6 +171,14 @@
     cursor:pointer;
     flex-shrink:0;
   }
+  .surprise-btn{
+    display:block;
+    width:100%;
+    padding:11px;
+    text-align:center;
+    margin-bottom:14px;
+    font-size:13px;
+  }
   .filter-icon-btn{
     position:relative;
     width:40px;
@@ -504,6 +512,13 @@
     opacity:0.55;
     box-shadow:none;
   }
+  .loan-card.overdue{
+    border-color:var(--tag-red);
+  }
+  .pill.overdue-pill{
+    background:var(--tag-red-bg);
+    color:var(--tag-red);
+  }
   .loan-title{
     font-family:'Source Serif 4', serif;
     font-weight:600;
@@ -589,9 +604,22 @@
     flex-direction:column;
     align-items:center;
     gap:3px;
+    position:relative;
   }
   nav.tabbar button .tab-glyph{ font-size:19px; }
   nav.tabbar button.active{ color:var(--spine); }
+  .tab-dot{
+    display:none;
+    position:absolute;
+    top:2px;
+    right:calc(50% - 24px);
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--tag-red);
+    border:1.5px solid var(--card);
+  }
+  .tab-dot.show{ display:block; }
 
   /* Sheet / modal */
   .sheet-backdrop{
@@ -611,8 +639,39 @@
     max-height:88vh;
     overflow-y:auto;
     animation: slideup .22s ease;
+    position:relative;
   }
   @keyframes slideup{ from{ transform:translateY(30px); opacity:0.5; } to{ transform:translateY(0); opacity:1; } }
+  .sheet-close-btn{
+    position:absolute;
+    top:14px;
+    right:14px;
+    width:28px;
+    height:28px;
+    border:none;
+    background:var(--paper-deep);
+    color:var(--ink-soft);
+    border-radius:50%;
+    font-size:13px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .surprise-sheet{ padding-top:26px; text-align:center; }
+  .surprise-cover-wrap{ text-align:center; margin-bottom:14px; }
+  .surprise-title{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:19px;
+    line-height:1.3;
+  }
+  .surprise-author{
+    font-size:13.5px;
+    color:var(--ink-soft);
+    margin-top:5px;
+    margin-bottom:6px;
+  }
   .sheet h2{
     font-family:'Source Serif 4', serif;
     font-size:19px;
@@ -1076,7 +1135,7 @@
     <button data-tab="library" class="active"><span class="tab-glyph">📖</span>Library</button>
     <button data-tab="progress"><span class="tab-glyph">📈</span>Progress</button>
     <button data-tab="wishlist"><span class="tab-glyph">🛒</span>List</button>
-    <button data-tab="lent"><span class="tab-glyph">🤝</span>Lent</button>
+    <button data-tab="lent"><span class="tab-glyph">🤝</span>Lent<span class="tab-dot" id="lentOverdueDot"></span></button>
   </nav>
 
   <div class="sheet-backdrop" id="sheetBackdrop">
@@ -1256,6 +1315,19 @@
     </div>
   </div>
 
+  <div class="sheet-backdrop" id="surpriseBackdrop">
+    <div class="sheet surprise-sheet">
+      <button class="sheet-close-btn" id="surpriseCloseBtn" title="Close">✕</button>
+      <div class="surprise-cover-wrap" id="surpriseCoverWrap"></div>
+      <div class="surprise-title" id="surpriseTitle"></div>
+      <div class="surprise-author" id="surpriseAuthor"></div>
+      <div class="sheet-actions">
+        <button class="btn" id="surpriseTryAgainBtn">Try again</button>
+        <button class="btn primary" id="surpriseStartBtn">Start reading</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -1279,6 +1351,10 @@
   let customFrom = '';
   let customTo = '';
   let editingId = null;
+  let wishSearchTerm = '';
+  let lentSearchTerm = '';
+  let lentStatusFilter = 'all'; // 'all' | 'active' | 'returned'
+  const OVERDUE_DAYS = 30;
 
   const STATUS_LABELS = {'to-read':'To read','reading':'Reading','done':'Read'};
   function starString(rating){
@@ -1296,6 +1372,15 @@
     if(!iso) return '';
     const d = new Date(iso + 'T00:00:00');
     return d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+  }
+  function daysSince(dateStr){
+    if(!dateStr) return 0;
+    const then = new Date(dateStr + 'T00:00:00');
+    const now = new Date();
+    return Math.floor((now - then) / 86400000);
+  }
+  function isOverdue(l){
+    return !l.returned && daysSince(l.dateLent) >= OVERDUE_DAYS;
   }
 
   const STORAGE_KEY = 'leebrary_books_v1';
@@ -1467,6 +1552,7 @@
         ${sortDir==='desc' ? '↓ Recent first' : '↑ Oldest first'}
       </button>
     </div>`;
+    html += `<button class="btn surprise-btn" id="surpriseBtn">🎲 Surprise me from your to-read pile</button>`;
     html += `<div class="search-row"><input type="text" id="searchInput" placeholder="Search title or author" value="${escapeAttr(searchTerm)}"></div>`;
 
     if(filtered.length === 0){
@@ -1517,7 +1603,17 @@
       sortDir = (sortDir === 'desc') ? 'asc' : 'desc';
       renderLibrary();
     });
+    document.getElementById('surpriseBtn').addEventListener('click', pickSurpriseBook);
     bindBookCardEvents();
+  }
+
+  function pickSurpriseBook(){
+    const pool = books.filter(b=>b.status === 'to-read');
+    if(pool.length === 0){
+      showConfirm('Your to-read pile is empty — add some books first!', { confirmLabel:'OK', cancelLabel:null });
+      return;
+    }
+    showRandomSurprise(pool);
   }
 
   function bookGridTile(b){
@@ -1738,19 +1834,40 @@
   // ---------- Rendering: Wishlist (buy list) ----------
   function renderWishlist(){
     const main = document.getElementById('main');
-    const list = wishlist.slice().sort((a,b)=> (b.dateAdded||'').localeCompare(a.dateAdded||''));
+    const all = wishlist.slice().sort((a,b)=> (b.dateAdded||'').localeCompare(a.dateAdded||''));
+    const list = all.filter(w=>{
+      if(!wishSearchTerm) return true;
+      const t = (w.title+' '+(w.author||'')+' '+(w.publisher||'')).toLowerCase();
+      return t.includes(wishSearchTerm.toLowerCase());
+    });
 
     let html = '';
+    html += `<div class="search-row"><input type="text" id="wishSearchInput" placeholder="Search title, author, or publisher" value="${escapeAttr(wishSearchTerm)}"></div>`;
+
     if(list.length === 0){
-      html += `<div class="empty">
-        <div class="glyph">🛒</div>
-        <div class="title">Your list is empty</div>
-        <div class="sub">Tap the + button to add a book you want to buy.</div>
-      </div>`;
+      html += all.length === 0
+        ? `<div class="empty">
+            <div class="glyph">🛒</div>
+            <div class="title">Your list is empty</div>
+            <div class="sub">Tap the + button to add a book you want to buy.</div>
+          </div>`
+        : `<div class="empty">
+            <div class="glyph">🛒</div>
+            <div class="title">No books match</div>
+            <div class="sub">Try a different search.</div>
+          </div>`;
     } else {
       html += list.map(wishCard).join('');
     }
     main.innerHTML = html;
+
+    document.getElementById('wishSearchInput').addEventListener('input', e=>{
+      wishSearchTerm = e.target.value;
+      renderWishlist();
+      const el = document.getElementById('wishSearchInput');
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
 
     main.querySelectorAll('[data-action]').forEach(el=>{
       el.addEventListener('click', ()=>{
@@ -1810,22 +1927,50 @@
     return books.filter(b=> !b.borrowed && !activeLoanBookIds.has(b.id));
   }
 
+  function loanMatches(l){
+    if(lentStatusFilter === 'active' && l.returned) return false;
+    if(lentStatusFilter === 'returned' && !l.returned) return false;
+    if(lentSearchTerm){
+      const t = (l.bookTitle+' '+(l.bookAuthor||'')+' '+l.personName).toLowerCase();
+      if(!t.includes(lentSearchTerm.toLowerCase())) return false;
+    }
+    return true;
+  }
+
   function renderLent(){
     const main = document.getElementById('main');
-    const active = loans.filter(l=>!l.returned).sort((a,b)=> (b.dateLent||'').localeCompare(a.dateLent||''));
-    const returned = loans.filter(l=>l.returned).sort((a,b)=> (b.dateReturned||b.dateLent||'').localeCompare(a.dateReturned||a.dateLent||''));
+    updateLentTabDot();
+    const filtered = loans.filter(loanMatches);
+    const overdue = filtered.filter(l=>isOverdue(l)).sort((a,b)=> (a.dateLent||'').localeCompare(b.dateLent||''));
+    const activeNormal = filtered.filter(l=>!l.returned && !isOverdue(l)).sort((a,b)=> (b.dateLent||'').localeCompare(a.dateLent||''));
+    const returned = filtered.filter(l=>l.returned).sort((a,b)=> (b.dateReturned||b.dateLent||'').localeCompare(a.dateReturned||a.dateLent||''));
 
     let html = '';
-    if(active.length === 0 && returned.length === 0){
-      html += `<div class="empty">
-        <div class="glyph">🤝</div>
-        <div class="title">No loans yet</div>
-        <div class="sub">Tap the + button to note who you've lent a book to.</div>
-      </div>`;
+    html += segmented('lentQuickFilter', [
+      ['all','All'],['active','Active'],['returned','Returned']
+    ], lentStatusFilter);
+    html += `<div class="search-row"><input type="text" id="lentSearchInput" placeholder="Search book or person" value="${escapeAttr(lentSearchTerm)}"></div>`;
+
+    if(overdue.length === 0 && activeNormal.length === 0 && returned.length === 0){
+      html += loans.length === 0
+        ? `<div class="empty">
+            <div class="glyph">🤝</div>
+            <div class="title">No loans yet</div>
+            <div class="sub">Tap the + button to note who you've lent a book to.</div>
+          </div>`
+        : `<div class="empty">
+            <div class="glyph">🤝</div>
+            <div class="title">No loans match</div>
+            <div class="sub">Try a different search or filter.</div>
+          </div>`;
     } else {
-      if(active.length){
+      if(overdue.length){
+        html += `<div class="section-label">Overdue</div>`;
+        html += overdue.map(loanCard).join('');
+      }
+      if(activeNormal.length){
         html += `<div class="section-label">Currently lent out</div>`;
-        html += active.map(loanCard).join('');
+        html += activeNormal.map(loanCard).join('');
       }
       if(returned.length){
         html += `<div class="section-label">Returned</div>`;
@@ -1833,6 +1978,15 @@
       }
     }
     main.innerHTML = html;
+
+    bindSegmented('lentQuickFilter', v=>{ lentStatusFilter = v; renderLent(); });
+    document.getElementById('lentSearchInput').addEventListener('input', e=>{
+      lentSearchTerm = e.target.value;
+      renderLent();
+      const el = document.getElementById('lentSearchInput');
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
 
     main.querySelectorAll('[data-action]').forEach(el=>{
       el.addEventListener('click', ()=>{
@@ -1861,14 +2015,16 @@
   }
 
   function loanCard(l){
+    const overdue = isOverdue(l);
     const statusText = l.returned
       ? `Returned ${fmtDate(l.dateReturned)}`
       : `Lent ${fmtDate(l.dateLent)}`;
-    return `<div class="loan-card${l.returned ? ' returned' : ''}">
+    const overdueBadge = overdue ? `<span class="pill overdue-pill">Overdue</span>` : '';
+    return `<div class="loan-card${l.returned ? ' returned' : ''}${overdue ? ' overdue' : ''}">
       <div class="loan-title">${escapeHtml(l.bookTitle)}</div>
       ${l.bookAuthor ? `<div class="loan-author">${escapeHtml(l.bookAuthor)}</div>` : ''}
       <div class="loan-person">Lent to <strong>${escapeHtml(l.personName)}</strong></div>
-      <div class="loan-date">${statusText}</div>
+      <div class="loan-date">${statusText} ${overdueBadge}</div>
       <div class="action-row">
         ${l.returned ? '' : `<button class="btn primary" data-action="return" data-id="${l.id}">Mark as returned</button>`}
         <button class="btn danger-outline" data-action="remove-loan" data-id="${l.id}">Remove</button>
@@ -2066,10 +2222,19 @@
   function escapeAttr(s){ return escapeHtml(s); }
 
   // ---------- Tab / view switching ----------
+  function hasOverdueLoans(){
+    return loans.some(l=>isOverdue(l));
+  }
+  function updateLentTabDot(){
+    const dot = document.getElementById('lentOverdueDot');
+    if(dot) dot.classList.toggle('show', hasOverdueLoans());
+  }
+
   function renderMain(){
     document.querySelectorAll('nav.tabbar button').forEach(b=>{
       b.classList.toggle('active', b.getAttribute('data-tab')===currentTab);
     });
+    updateLentTabDot();
     const fab = document.getElementById('fabAdd');
     fab.style.display = (view === 'detail') ? 'none' : 'flex';
     fab.title = (currentTab === 'wishlist') ? 'Add to your list' : (currentTab === 'lent') ? 'Lend a book' : 'Add a book';
@@ -2353,6 +2518,45 @@
     await saveLoans();
     closeLendSheet();
     renderLent();
+  });
+
+  // ---------- Surprise me popup ----------
+  const surpriseBackdrop = document.getElementById('surpriseBackdrop');
+  let surpriseBookId = null;
+
+  function renderSurpriseSheet(book){
+    const cover = book.cover
+      ? `<img class="detail-cover" src="${book.cover}" alt="">`
+      : `<div class="detail-cover-placeholder">📕</div>`;
+    document.getElementById('surpriseCoverWrap').innerHTML = cover;
+    document.getElementById('surpriseTitle').textContent = book.title;
+    document.getElementById('surpriseAuthor').textContent = book.author || '';
+  }
+  function showRandomSurprise(pool){
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    surpriseBookId = pick.id;
+    renderSurpriseSheet(pick);
+    surpriseBackdrop.classList.add('open');
+  }
+  function closeSurprise(){
+    surpriseBackdrop.classList.remove('open');
+    surpriseBookId = null;
+  }
+  document.getElementById('surpriseCloseBtn').addEventListener('click', closeSurprise);
+  surpriseBackdrop.addEventListener('click', e=>{ if(e.target===surpriseBackdrop) closeSurprise(); });
+  document.getElementById('surpriseTryAgainBtn').addEventListener('click', ()=>{
+    let pool = books.filter(b=>b.status === 'to-read');
+    if(pool.length === 0){ closeSurprise(); return; }
+    if(pool.length > 1) pool = pool.filter(b=>b.id !== surpriseBookId);
+    showRandomSurprise(pool);
+  });
+  document.getElementById('surpriseStartBtn').addEventListener('click', async ()=>{
+    const book = books.find(b=>b.id===surpriseBookId);
+    if(!book) return;
+    book.status = 'reading';
+    await saveBooks();
+    closeSurprise();
+    if(view === 'library') renderLibrary();
   });
 
   // ---------- Filters sheet ----------
