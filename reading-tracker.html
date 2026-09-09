@@ -1,0 +1,2124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leebrary — Reading Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F1E7E9;
+    --paper-deep: #E3D2D6;
+    --card: #FBF6F5;
+    --ink: #2B2230;
+    --ink-soft: #7C6B75;
+    --spine: #5B3A5C;
+    --spine-deep: #3B2640;
+    --brass: #B8863A;
+    --brass-bg: #F1E2C4;
+    --leather: #8C5A3A;
+    --leather-bg: #F0DDC8;
+    --rust: #A6483B;
+    --line: #E0CCD1;
+    --shadow: 0 2px 10px rgba(43,34,48,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--paper-deep);
+    font-family:'Inter', system-ui, sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    display:flex;
+    justify-content:center;
+    min-height:100vh;
+  }
+  #app{
+    width:100%;
+    max-width:430px;
+    min-height:100vh;
+    background:var(--paper);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    box-shadow: 0 0 40px rgba(0,0,0,0.12);
+  }
+
+  /* Header */
+  header{
+    padding:22px 20px 14px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    border-bottom:1px solid var(--line);
+  }
+  header .brand{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:26px;
+    letter-spacing:-0.01em;
+  }
+  header .brand .script{
+    color:var(--spine);
+  }
+  header .tagline{
+    font-size:11.5px;
+    color:var(--ink-soft);
+  }
+
+  main{
+    flex:1;
+    padding:16px 18px 100px;
+    overflow-y:auto;
+  }
+
+  /* Segmented control */
+  .segmented{
+    display:flex;
+    background:var(--paper-deep);
+    border-radius:11px;
+    padding:3px;
+    gap:2px;
+    margin-bottom:14px;
+  }
+  .segmented button{
+    flex:1;
+    border:none;
+    background:transparent;
+    padding:8px 4px;
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    border-radius:8px;
+    cursor:pointer;
+    transition: background .15s, color .15s;
+    white-space:nowrap;
+  }
+  .segmented button.active{
+    background:var(--card);
+    color:var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .segmented.scroll{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .segmented.scroll button{ flex:0 0 auto; padding:8px 12px; }
+  .quick-filter-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-bottom:14px;
+  }
+  .quick-filter-row .segmented{ flex:1; margin-bottom:0; }
+  .sort-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .sort-label{
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+  }
+  .sort-toggle-btn{
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:100px;
+    padding:6px 13px;
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink);
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .filter-icon-btn{
+    position:relative;
+    width:40px;
+    height:40px;
+    border-radius:11px;
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink-soft);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .filter-badge{
+    position:absolute;
+    top:-5px; right:-5px;
+    background:var(--rust);
+    color:#fff;
+    font-size:10px;
+    font-weight:700;
+    min-width:16px;
+    height:16px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 3px;
+  }
+  .filter-section{ margin-bottom:20px; }
+  .filter-section-label{
+    font-size:12px;
+    font-weight:700;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+  .chip-multi{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .chip-multi button{
+    padding:8px 14px;
+    border-radius:100px;
+    border:1px solid var(--line);
+    background:var(--card);
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .chip-multi button.active{
+    background:var(--spine);
+    color:#fff;
+    border-color:var(--spine);
+  }
+
+  /* Search */
+  .search-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .search-row input[type="text"]{
+    flex:1;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:10px;
+    padding:9px 12px;
+    font-family:inherit;
+    font-size:13.5px;
+    color:var(--ink);
+  }
+  .search-row input::placeholder{ color: #B0A0A8; }
+
+  /* Book card */
+  .book-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 15px;
+    margin-bottom:11px;
+    box-shadow: var(--shadow);
+    cursor:pointer;
+    transition: transform .08s ease;
+  }
+  .book-card:active{ transform: scale(0.985); }
+  .book-card:focus-visible{ outline:2px solid var(--spine); outline-offset:2px; }
+  .book-card .row-top{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .row-top .titles{
+    display:flex;
+    gap:10px;
+    flex:1;
+    min-width:0;
+  }
+  .cover-thumb{
+    width:42px;
+    height:58px;
+    border-radius:5px;
+    object-fit:cover;
+    flex-shrink:0;
+    box-shadow: 0 1px 4px rgba(43,34,48,0.25);
+    border:1px solid rgba(0,0,0,0.06);
+  }
+  .cover-placeholder{
+    width:42px;
+    height:58px;
+    border-radius:5px;
+    flex-shrink:0;
+    background: linear-gradient(160deg, var(--spine), var(--spine-deep));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:16px;
+  }
+  .book-title{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:16.5px;
+    line-height:1.25;
+  }
+  .book-author{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+  .stars-row{
+    margin-top:6px;
+    letter-spacing:1px;
+    font-size:14px;
+  }
+  .stars-row.small{ font-size:12px; letter-spacing:0.5px; }
+  .star-filled{ color:var(--brass); }
+  .star-empty{ color:var(--line); }
+
+  .pill-row{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin:6px 0 0;
+  }
+  .pill{
+    font-size:11px;
+    font-weight:600;
+    padding:3px 9px;
+    border-radius:100px;
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+  }
+  .pill.status-to-read{ background:#ECD9D3; color:var(--ink-soft); }
+  .pill.status-reading{ background:var(--spine); color:#fff; }
+  .pill.status-done{ background:var(--leather-bg); color:var(--leather); }
+  .pill.owned{ background:#EDE2EC; color:var(--spine-deep); }
+  .pill.borrowed{ background:var(--brass-bg); color:var(--brass); }
+  .pill .dot{ width:5px;height:5px;border-radius:50%;background:currentColor; }
+
+  .action-row{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+  .btn{
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:600;
+    padding:7px 12px;
+    border-radius:9px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    cursor:pointer;
+    transition: transform .08s ease;
+  }
+  .btn:active{ transform: scale(0.96); }
+  .btn.primary{
+    background:var(--spine);
+    color:#fff;
+    border-color:var(--spine);
+  }
+  .btn.ghost-brass{
+    background:var(--brass-bg);
+    color:var(--brass);
+    border-color:transparent;
+  }
+  .btn.ghost-brass.active{
+    background:var(--brass);
+    color:#fff;
+  }
+  .finished-note{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:8px;
+  }
+
+  /* Empty state */
+  .empty{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--ink-soft);
+  }
+  .empty .glyph{
+    font-size:30px;
+    margin-bottom:10px;
+  }
+  .empty .title{
+    font-family:'Source Serif 4', serif;
+    font-size:17px;
+    color:var(--ink);
+    margin-bottom:4px;
+  }
+  .empty .sub{ font-size:12.5px; }
+
+  /* FAB */
+  .fab{
+    position:absolute;
+    right:20px;
+    bottom:92px;
+    width:52px;
+    height:52px;
+    border-radius:16px;
+    background:var(--spine);
+    color:#fff;
+    border:none;
+    font-size:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    box-shadow: 0 6px 16px rgba(91,58,92,0.35);
+    transition: transform .1s ease;
+  }
+  .fab:active{ transform: scale(0.93); }
+
+  /* Bottom tab bar */
+  nav.tabbar{
+    position:absolute;
+    bottom:0; left:0; right:0;
+    background:var(--card);
+    border-top:1px solid var(--line);
+    display:flex;
+    padding:8px 10px 12px;
+  }
+  nav.tabbar button{
+    flex:1;
+    background:none;
+    border:none;
+    font-family:inherit;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    padding:6px 4px 0;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+  }
+  nav.tabbar button .tab-glyph{ font-size:19px; }
+  nav.tabbar button.active{ color:var(--spine); }
+
+  /* Sheet / modal */
+  .sheet-backdrop{
+    position:absolute;
+    inset:0;
+    background:rgba(43,34,48,0.4);
+    display:none;
+    align-items:flex-end;
+    z-index:20;
+  }
+  .sheet-backdrop.open{ display:flex; }
+  .sheet{
+    background:var(--paper);
+    width:100%;
+    border-radius:20px 20px 0 0;
+    padding:20px 20px 26px;
+    max-height:88vh;
+    overflow-y:auto;
+    animation: slideup .22s ease;
+  }
+  @keyframes slideup{ from{ transform:translateY(30px); opacity:0.5; } to{ transform:translateY(0); opacity:1; } }
+  .sheet h2{
+    font-family:'Source Serif 4', serif;
+    font-size:19px;
+    margin:0 0 16px;
+  }
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:5px;
+  }
+  .field label .req{ color:var(--rust); }
+  .field input[type="text"], .field input[type="date"]{
+    width:100%;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:10px;
+    padding:10px 12px;
+    font-family:inherit;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .cover-field{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .cover-preview-wrap{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .cover-preview{
+    width:52px;
+    height:72px;
+    object-fit:cover;
+    border-radius:6px;
+    box-shadow: 0 1px 4px rgba(43,34,48,0.25);
+  }
+  .upload-btn{
+    display:inline-block;
+    font-size:12.5px;
+    font-weight:600;
+    padding:9px 13px;
+    border-radius:9px;
+    border:1px dashed var(--line);
+    background:var(--card);
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .status-choice{
+    display:flex;
+    gap:8px;
+  }
+  .status-choice button{
+    flex:1;
+    padding:9px 4px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--card);
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .status-choice button.active{
+    background:var(--spine);
+    color:#fff;
+    border-color:var(--spine);
+  }
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 12px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+  }
+  .toggle-row span{ font-size:13.5px; font-weight:500; }
+  .switch{
+    width:38px; height:22px;
+    background:#DDC9CE;
+    border-radius:100px;
+    position:relative;
+    cursor:pointer;
+    transition: background .15s;
+    flex-shrink:0;
+  }
+  .switch.on{ background:var(--brass); }
+  .switch .knob{
+    position:absolute;
+    top:2px; left:2px;
+    width:18px; height:18px;
+    border-radius:50%;
+    background:#fff;
+    transition: left .15s;
+  }
+  .switch.on .knob{ left:18px; }
+  .rating-picker{
+    display:flex;
+    gap:6px;
+  }
+  .star-btn{
+    border:none;
+    background:none;
+    font-size:27px;
+    line-height:1;
+    color:var(--line);
+    cursor:pointer;
+    padding:2px;
+  }
+  .star-btn.filled{ color:var(--brass); }
+  .field textarea{
+    width:100%;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:10px;
+    padding:10px 12px;
+    font-family:inherit;
+    font-size:13.5px;
+    color:var(--ink);
+    resize:vertical;
+    min-height:66px;
+  }
+  .sheet-actions{
+    display:flex;
+    gap:10px;
+    margin-top:8px;
+  }
+  .sheet-actions .btn{ flex:1; padding:11px; text-align:center; font-size:13.5px; }
+
+  /* Progress page */
+  .stat-hero{
+    text-align:center;
+    padding:22px 10px 26px;
+  }
+  .stat-hero .num{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:52px;
+    color:var(--spine-deep);
+    line-height:1;
+  }
+  .stat-hero .label{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:6px;
+  }
+  .month-select-row{
+    display:flex;
+    justify-content:center;
+    margin-bottom:10px;
+  }
+  .month-select{
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:10px;
+    padding:8px 16px;
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:15px;
+    color:var(--ink);
+    cursor:pointer;
+    min-width:140px;
+    text-align:center;
+    text-align-last:center;
+  }
+  .year-switch{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    margin-bottom:6px;
+  }
+  .year-switch button{
+    border:none;
+    background:var(--card);
+    border:1px solid var(--line);
+    width:30px;height:30px;
+    border-radius:8px;
+    font-size:14px;
+    cursor:pointer;
+    color:var(--ink-soft);
+  }
+  .year-switch .yr{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size:16px;
+    min-width:52px;
+    text-align:center;
+  }
+  .custom-range{
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .custom-range .field{ flex:1; margin-bottom:0; }
+
+  .chart{
+    display:flex;
+    align-items:flex-end;
+    gap:6px;
+    height:120px;
+    padding:0 4px 8px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:8px;
+  }
+  .chart .bar-wrap{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-end;
+    height:100%;
+    gap:5px;
+  }
+  .chart .bar{
+    width:100%;
+    max-width:26px;
+    background:var(--spine);
+    border-radius:4px 4px 2px 2px;
+    min-height:3px;
+    transition: height .3s ease;
+  }
+  .chart .bar.zero{ background:var(--line); }
+  .chart .bar-label{
+    font-size:9.5px;
+    color:var(--ink-soft);
+    font-weight:600;
+  }
+  .chart .bar-count{
+    font-size:10px;
+    font-weight:700;
+    color:var(--ink-soft);
+  }
+
+  .section-label{
+    font-size:12px;
+    font-weight:700;
+    text-transform:none;
+    color:var(--ink-soft);
+    margin: 18px 0 10px;
+  }
+  .finished-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    gap:10px;
+  }
+  .finished-item .ft{ font-size:13.5px; }
+  .finished-item .fa{ font-size:11.5px; color:var(--ink-soft); }
+  .finished-item .fd{ font-size:11px; color:var(--ink-soft); flex-shrink:0; }
+
+  /* Detail page */
+  .back-btn{
+    background:none;
+    border:none;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink-soft);
+    cursor:pointer;
+    padding:0 0 16px;
+  }
+  .back-btn:hover{ color:var(--spine); }
+  .detail-pager{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    margin-bottom:18px;
+  }
+  .pager-btn{
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink-soft);
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:600;
+    padding:7px 13px;
+    border-radius:9px;
+    cursor:pointer;
+  }
+  .pager-btn:disabled{ opacity:0.4; cursor:default; }
+  .pager-count{
+    font-size:12px;
+    color:var(--ink-soft);
+    font-weight:600;
+    min-width:64px;
+    text-align:center;
+  }
+  .detail-hero{
+    display:flex;
+    gap:16px;
+    align-items:flex-start;
+    margin-bottom:6px;
+  }
+  .detail-cover{
+    width:104px;
+    height:148px;
+    object-fit:cover;
+    border-radius:8px;
+    box-shadow: 0 3px 10px rgba(43,34,48,0.3);
+    flex-shrink:0;
+  }
+  .detail-cover-placeholder{
+    width:104px;
+    height:148px;
+    border-radius:8px;
+    background: linear-gradient(160deg, var(--spine), var(--spine-deep));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:36px;
+    flex-shrink:0;
+  }
+  .detail-titles{ padding-top:6px; }
+  .detail-title{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:21px;
+    line-height:1.25;
+  }
+  .detail-author{
+    font-size:13.5px;
+    color:var(--ink-soft);
+    margin-top:5px;
+  }
+  .detail-dates{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin:12px 0 4px;
+  }
+  .history-note{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    font-style:italic;
+    margin:0 0 16px;
+  }
+  .history-list{
+    margin:0;
+    padding-left:18px;
+    font-size:13px;
+    color:var(--ink);
+  }
+  .history-list li{ margin-bottom:4px; }
+  .detail-review p{
+    font-size:13.5px;
+    line-height:1.55;
+    white-space:pre-wrap;
+    margin:0;
+  }
+  .btn.danger-outline{
+    border-color:var(--rust);
+    color:var(--rust);
+    background:transparent;
+  }
+  .btn.danger-solid{
+    background:var(--rust);
+    color:#fff;
+    border-color:var(--rust);
+  }
+  .confirm-sheet{ padding-top:26px; }
+  .confirm-message{
+    font-size:14.5px;
+    line-height:1.55;
+    margin-bottom:20px;
+  }
+  .share-sheet{ padding-top:24px; }
+  .share-preview-wrap{
+    display:flex;
+    justify-content:center;
+    margin-bottom:14px;
+  }
+  .share-preview-img{
+    max-width:100%;
+    max-height:56vh;
+    border-radius:12px;
+    box-shadow: var(--shadow);
+  }
+  .share-hint{
+    font-size:12px;
+    color:var(--ink-soft);
+    text-align:center;
+    margin-bottom:16px;
+  }
+  .sheet-actions a.btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+  }
+  .share-progress-btn{
+    margin-top:14px;
+  }
+  .detail-footer-actions{
+    display:flex;
+    gap:10px;
+    margin-top:22px;
+  }
+  .detail-footer-actions .btn{ flex:1; text-align:center; padding:11px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div>
+      <div class="brand"><span class="script">Lee</span>brary</div>
+      <div class="tagline">a library that remembers</div>
+    </div>
+  </header>
+
+  <main id="main"></main>
+
+  <button class="fab" id="fabAdd" title="Add a book">+</button>
+
+  <nav class="tabbar">
+    <button data-tab="library" class="active"><span class="tab-glyph">📖</span>Library</button>
+    <button data-tab="progress"><span class="tab-glyph">📈</span>Progress</button>
+  </nav>
+
+  <div class="sheet-backdrop" id="sheetBackdrop">
+    <div class="sheet">
+      <h2 id="sheetTitle">Add a book</h2>
+      <div class="field">
+        <label for="fTitle">Title <span class="req">*</span></label>
+        <input type="text" id="fTitle" placeholder="The Left Hand of Darkness">
+      </div>
+      <div class="field">
+        <label for="fAuthor">Author <span class="req">*</span></label>
+        <input type="text" id="fAuthor" placeholder="Ursula K. Le Guin">
+      </div>
+      <div class="field">
+        <label>Cover image (optional)</label>
+        <div class="cover-field">
+          <div class="cover-preview-wrap" id="coverPreviewWrap" style="display:none;">
+            <img id="coverPreview" class="cover-preview" alt="Cover preview">
+            <button type="button" class="btn" id="removeCoverBtn">Remove</button>
+          </div>
+          <label class="upload-btn" id="uploadBtn" for="fCover">Choose a photo</label>
+          <input type="file" id="fCover" accept="image/*" style="display:none;">
+        </div>
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <div class="status-choice" id="statusChoice">
+          <button data-status="to-read" class="active">To read</button>
+          <button data-status="reading">Reading</button>
+          <button data-status="done">Read</button>
+        </div>
+      </div>
+      <div class="field" id="finishedDateField" style="display:none;">
+        <label for="fFinished">Date finished</label>
+        <input type="date" id="fFinished">
+      </div>
+      <div class="field">
+        <div class="toggle-row">
+          <span>Borrowed copy</span>
+          <div class="switch" id="borrowedSwitch"><div class="knob"></div></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Your rating (optional)</label>
+        <div class="rating-picker" id="ratingPicker">
+          <button type="button" class="star-btn" data-val="1">★</button>
+          <button type="button" class="star-btn" data-val="2">★</button>
+          <button type="button" class="star-btn" data-val="3">★</button>
+          <button type="button" class="star-btn" data-val="4">★</button>
+          <button type="button" class="star-btn" data-val="5">★</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fReview">Notes / review (optional)</label>
+        <textarea id="fReview" rows="3" placeholder="What stood out to you?"></textarea>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn" id="cancelSheet">Cancel</button>
+        <button class="btn primary" id="saveSheet">Save book</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="filtersBackdrop">
+    <div class="sheet">
+      <h2>Filters</h2>
+      <div class="filter-section">
+        <div class="filter-section-label">Reading status</div>
+        <div class="chip-multi" id="statusChipGroup">
+          <button data-val="to-read">To read</button>
+          <button data-val="reading">Reading</button>
+          <button data-val="done">Done</button>
+        </div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-section-label">Ownership</div>
+        <div class="chip-multi" id="ownerChipGroup">
+          <button data-val="owned">Owned</button>
+          <button data-val="borrowed">Borrowed</button>
+        </div>
+      </div>
+      <div class="filter-section">
+        <div class="filter-section-label">Rating</div>
+        <div class="chip-multi" id="ratingChipGroup">
+          <button data-val="1">★1</button>
+          <button data-val="2">★2</button>
+          <button data-val="3">★3</button>
+          <button data-val="4">★4</button>
+          <button data-val="5">★5</button>
+        </div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn" id="clearFiltersBtn">Clear all</button>
+        <button class="btn primary" id="applyFiltersBtn">Show results</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="confirmBackdrop">
+    <div class="sheet confirm-sheet">
+      <div class="confirm-message" id="confirmMessage"></div>
+      <div class="sheet-actions">
+        <button class="btn" id="confirmCancelBtn">Cancel</button>
+        <button class="btn danger-solid" id="confirmOkBtn">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="shareBackdrop">
+    <div class="sheet share-sheet">
+      <h2>Share</h2>
+      <div class="share-preview-wrap">
+        <img id="sharePreviewImg" class="share-preview-img" alt="Shareable image preview">
+      </div>
+      <div class="share-hint">Tap and hold the image to save it, or use the button below.</div>
+      <div class="sheet-actions">
+        <button class="btn" id="shareCloseBtn">Close</button>
+        <a class="btn primary" id="shareDownloadBtn" download>Download image</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let books = [];
+  let currentTab = 'library';
+  let view = 'library'; // 'library' | 'progress' | 'detail'
+  let selectedBookId = null;
+  let statusFilters = new Set();   // 'to-read' | 'reading' | 'done'
+  let ownerFilters = new Set();    // 'owned' | 'borrowed'
+  let ratingFilters = new Set();   // 1-5
+  let searchTerm = '';
+  let sortDir = 'desc'; // 'desc' = recent first, 'asc' = oldest first
+  let progressPeriod = 'month';
+  let progressYear = new Date().getFullYear();
+  let progressMonth = new Date().getMonth(); // 0-11, used by the Month period view
+  let customFrom = '';
+  let customTo = '';
+  let editingId = null;
+
+  const STATUS_LABELS = {'to-read':'To read','reading':'Reading','done':'Read'};
+  function starString(rating){
+    const r = Math.max(0, Math.min(5, rating||0));
+    let out = '';
+    for(let i=1;i<=5;i++){
+      out += `<span class="${i<=r?'star-filled':'star-empty'}">★</span>`;
+    }
+    return out;
+  }
+
+  function uid(){ return 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function fmtDate(iso){
+    if(!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+  }
+
+  const STORAGE_KEY = 'leebrary_books_v1';
+
+  async function loadBooks(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      books = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      books = [];
+    }
+  }
+  async function saveBooks(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+    }catch(e){
+      console.error('Could not save', e);
+    }
+  }
+
+  // ---------- Rendering: Library ----------
+  function bookMatchesFilters(b){
+    if(statusFilters.size > 0 && !statusFilters.has(b.status)) return false;
+    if(ownerFilters.size > 0){
+      const ownKey = b.borrowed ? 'borrowed' : 'owned';
+      if(!ownerFilters.has(ownKey)) return false;
+    }
+    if(ratingFilters.size > 0 && !ratingFilters.has(b.rating||0)) return false;
+    return true;
+  }
+  function quickStatusValue(){
+    if(statusFilters.size === 0) return 'all';
+    if(statusFilters.size === 1 && statusFilters.has('to-read')) return 'to-read';
+    if(statusFilters.size === 1 && statusFilters.has('done')) return 'done';
+    return null;
+  }
+  function advancedFilterCount(){
+    let n = ownerFilters.size + ratingFilters.size;
+    if(statusFilters.has('reading')) n++;
+    return n;
+  }
+  function activeSortField(){
+    // Done-only view sorts by when it was finished; everything else sorts by when it was added.
+    return (statusFilters.size === 1 && statusFilters.has('done')) ? 'finished' : 'added';
+  }
+  function sortKeyFor(b, field){
+    if(field === 'finished'){
+      const dates = getReadDates(b);
+      return dates.length ? dates[dates.length-1] : '';
+    }
+    return b.dateAdded || '';
+  }
+  function idTimestamp(b){
+    // uid() embeds the creation time as 'b_<timestamp>_<rand>' — use it to break
+    // ties between books whose date-only field (dateAdded/dateFinished) is identical,
+    // e.g. several books added or finished on the same day.
+    const parts = (b.id || '').split('_');
+    return parts.length > 1 ? (parseInt(parts[1], 10) || 0) : 0;
+  }
+  function filteredBooks(){
+    const field = activeSortField();
+    return books.filter(b=>{
+      if(!bookMatchesFilters(b)) return false;
+      if(searchTerm){
+        const t = (b.title+' '+b.author).toLowerCase();
+        if(!t.includes(searchTerm.toLowerCase())) return false;
+      }
+      return true;
+    }).sort((a,b)=>{
+      const ka = sortKeyFor(a, field), kb = sortKeyFor(b, field);
+      let cmp = sortDir === 'desc' ? kb.localeCompare(ka) : ka.localeCompare(kb);
+      if(cmp === 0){
+        const ta = idTimestamp(a), tb = idTimestamp(b);
+        cmp = sortDir === 'desc' ? (tb - ta) : (ta - tb);
+      }
+      return cmp;
+    });
+  }
+
+  function renderLibrary(){
+    const main = document.getElementById('main');
+    const filtered = filteredBooks();
+    const sortField = activeSortField();
+
+    const badge = advancedFilterCount();
+    let html = '';
+    html += `<div class="quick-filter-row">
+      <div class="segmented" id="quickFilter">
+        <button data-val="all" class="${quickStatusValue()==='all'?'active':''}">All</button>
+        <button data-val="to-read" class="${quickStatusValue()==='to-read'?'active':''}">To read</button>
+        <button data-val="done" class="${quickStatusValue()==='done'?'active':''}">Done</button>
+      </div>
+      <button class="filter-icon-btn" id="filterIconBtn" title="More filters">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="4 4 20 4 14 12 14 19 10 21 10 12 4 4"></polygon></svg>
+        ${badge > 0 ? `<span class="filter-badge">${badge}</span>` : ''}
+      </button>
+    </div>`;
+    html += `<div class="sort-row">
+      <span class="sort-label">Sort by ${sortField==='finished' ? 'done date' : 'added date'}</span>
+      <button class="sort-toggle-btn" id="sortDirBtn" title="Toggle sort direction">
+        ${sortDir==='desc' ? '↓ Recent first' : '↑ Oldest first'}
+      </button>
+    </div>`;
+    html += `<div class="search-row"><input type="text" id="searchInput" placeholder="Search title or author" value="${escapeAttr(searchTerm)}"></div>`;
+
+    if(filtered.length === 0){
+      html += `<div class="empty">
+        <div class="glyph">📚</div>
+        <div class="title">${books.length===0 ? 'Your shelf is empty' : 'No books match'}</div>
+        <div class="sub">${books.length===0 ? 'Tap the + button to add your first book.' : 'Try different filters or search.'}</div>
+      </div>`;
+    } else {
+      html += filtered.map(bookCard).join('');
+    }
+    main.innerHTML = html;
+
+    document.getElementById('searchInput').addEventListener('input', e=>{
+      searchTerm = e.target.value;
+      renderLibrary();
+      const el = document.getElementById('searchInput');
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+    document.getElementById('quickFilter').querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const v = btn.getAttribute('data-val');
+        if(v === 'all') statusFilters.clear();
+        else statusFilters = new Set([v]);
+        renderLibrary();
+      });
+    });
+    document.getElementById('filterIconBtn').addEventListener('click', openFilters);
+    document.getElementById('sortDirBtn').addEventListener('click', ()=>{
+      sortDir = (sortDir === 'desc') ? 'asc' : 'desc';
+      renderLibrary();
+    });
+    bindBookCardEvents();
+  }
+
+  function bookCard(b){
+    const statusPill = `<span class="pill status-${b.status}"><span class="dot"></span>${STATUS_LABELS[b.status]}</span>`;
+    const ownerPill = b.borrowed
+      ? `<span class="pill borrowed"><span class="dot"></span>Borrowed</span>`
+      : `<span class="pill owned"><span class="dot"></span>Owned</span>`;
+    const thumb = b.cover
+      ? `<img class="cover-thumb" src="${b.cover}" alt="">`
+      : `<div class="cover-placeholder">📕</div>`;
+    const stars = b.rating ? `<div class="stars-row small">${starString(b.rating)}</div>` : '';
+
+    return `<div class="book-card" data-id="${b.id}" role="button" tabindex="0">
+      <div class="row-top">
+        <div class="titles">
+          ${thumb}
+          <div>
+            <div class="book-title">${escapeHtml(b.title)}</div>
+            ${b.author ? `<div class="book-author">${escapeHtml(b.author)}</div>` : ''}
+            <div class="pill-row">${statusPill}${ownerPill}</div>
+            ${stars}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function bindBookCardEvents(){
+    document.querySelectorAll('.book-card').forEach(card=>{
+      const openDetail = () => {
+        selectedBookId = card.getAttribute('data-id');
+        view = 'detail';
+        renderMain();
+      };
+      card.addEventListener('click', openDetail);
+      card.addEventListener('keydown', e=>{
+        if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openDetail(); }
+      });
+    });
+  }
+
+  // ---------- Rendering: Book detail ----------
+  function ordinal(n){
+    const s = ['th','st','nd','rd'];
+    const v = n % 100;
+    return n + (s[(v-20)%10] || s[v] || s[0]);
+  }
+
+  function renderDetail(){
+    const main = document.getElementById('main');
+    const b = books.find(x=>x.id===selectedBookId);
+    if(!b){ view = 'library'; renderLibrary(); return; }
+    const history = b.readHistory || [];
+
+    const cover = b.cover
+      ? `<img class="detail-cover" src="${b.cover}" alt="">`
+      : `<div class="detail-cover-placeholder">📕</div>`;
+    const statusPill = `<span class="pill status-${b.status}"><span class="dot"></span>${STATUS_LABELS[b.status]}</span>`;
+    const ownerPill = b.borrowed
+      ? `<span class="pill borrowed"><span class="dot"></span>Borrowed</span>`
+      : `<span class="pill owned"><span class="dot"></span>Owned</span>`;
+    const stars = b.rating ? `<div class="stars-row">${starString(b.rating)}</div>` : '';
+    const review = b.review ? `<div class="detail-review"><div class="section-label">Notes</div><p>${escapeHtml(b.review)}</p></div>` : '';
+
+    // If currently to-read/reading but it has been finished before, surface that plainly.
+    const rereadNote = (b.status !== 'done' && history.length > 0)
+      ? `<div class="history-note">Read ${history.length} time${history.length===1?'':'s'} before · last finished ${fmtDate(history[history.length-1])}</div>`
+      : '';
+
+    // A full dated log only earns its place once there's more than one read to compare.
+    const historyList = history.length > 1 ? `
+      <div class="detail-review">
+        <div class="section-label">Read history</div>
+        <ul class="history-list">
+          ${history.map((d,i)=>`<li>${ordinal(i+1)} time — ${fmtDate(d)}</li>`).join('')}
+        </ul>
+      </div>` : '';
+
+    let statusActions = '';
+    if(b.status === 'to-read'){
+      statusActions += `<button class="btn" data-action="start" data-id="${b.id}">Start reading</button>`;
+      statusActions += `<button class="btn primary" data-action="done" data-id="${b.id}">Mark done</button>`;
+    } else if(b.status === 'reading'){
+      statusActions += `<button class="btn primary" data-action="done" data-id="${b.id}">Mark done</button>`;
+    } else {
+      statusActions += `<button class="btn" data-action="reopen" data-id="${b.id}">Reopen</button>`;
+    }
+    statusActions += `<button class="btn ghost-brass${b.borrowed?' active':''}" data-action="toggle-borrowed" data-id="${b.id}">${b.borrowed?'Mark owned':'Mark borrowed'}</button>`;
+
+    const backloggedFinish = b.dateFinished && b.dateAdded && b.dateFinished < b.dateAdded;
+    const dates = backloggedFinish
+      ? `<div class="detail-dates">Finished ${fmtDate(b.dateFinished)}</div>`
+      : `<div class="detail-dates">Added ${fmtDate(b.dateAdded)}${b.dateFinished ? ` · Finished ${fmtDate(b.dateFinished)}` : ''}</div>`;
+
+    // Prev/Next cycle through whatever set of books the library list currently shows (filters + search applied).
+    const list = filteredBooks();
+    let idx = list.findIndex(x=>x.id===b.id);
+    if(idx === -1){ idx = 0; }
+    const hasList = list.length > 0;
+    const pager = hasList ? `<div class="detail-pager">
+      <button class="pager-btn" id="prevBookBtn" ${idx<=0?'disabled':''}>‹ Prev</button>
+      <span class="pager-count">${idx+1} of ${list.length}</span>
+      <button class="pager-btn" id="nextBookBtn" ${idx>=list.length-1?'disabled':''}>Next ›</button>
+    </div>` : '';
+
+    main.innerHTML = `
+      <button class="back-btn" id="backBtn">‹ Back to library</button>
+      ${pager}
+      <div class="detail-hero">
+        ${cover}
+        <div class="detail-titles">
+          <div class="detail-title">${escapeHtml(b.title)}</div>
+          ${b.author ? `<div class="detail-author">${escapeHtml(b.author)}</div>` : ''}
+        </div>
+      </div>
+      <div class="pill-row">${statusPill}${ownerPill}</div>
+      ${stars}
+      ${dates}
+      ${rereadNote}
+      <div class="action-row">${statusActions}</div>
+      ${review}
+      ${historyList}
+      <div class="detail-footer-actions">
+        <button class="btn" data-action="share" data-id="${b.id}">Share</button>
+        <button class="btn" data-action="edit" data-id="${b.id}">Edit</button>
+        <button class="btn danger-outline" data-action="delete" data-id="${b.id}">Delete</button>
+      </div>
+    `;
+
+    document.getElementById('backBtn').addEventListener('click', ()=>{ view = currentTab; renderMain(); });
+    if(hasList){
+      const prevBtn = document.getElementById('prevBookBtn');
+      const nextBtn = document.getElementById('nextBookBtn');
+      prevBtn.addEventListener('click', ()=>{
+        if(idx > 0){ selectedBookId = list[idx-1].id; renderDetail(); }
+      });
+      nextBtn.addEventListener('click', ()=>{
+        if(idx < list.length-1){ selectedBookId = list[idx+1].id; renderDetail(); }
+      });
+    }
+    main.querySelectorAll('[data-action]').forEach(el=>{
+      el.addEventListener('click', async ()=>{
+        const action = el.getAttribute('data-action');
+        const book = books.find(x=>x.id===selectedBookId);
+        if(!book) return;
+        if(action==='edit'){ openSheet(book); return; }
+        if(action==='share'){
+          const canvas = await buildBookShareCanvas(book);
+          const safeName = (book.title||'book').toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40).replace(/(^-|-$)/g,'') || 'book';
+          shareCanvas(canvas, `leebrary-${safeName}.png`, `${book.title}${book.author?' by '+book.author:''} — via Leebrary`);
+          return;
+        }
+        if(action==='delete'){
+          showConfirm(`Remove "${book.title}" from your shelf?`, {
+            confirmLabel: 'Remove',
+            onConfirm: ()=>{
+              books = books.filter(x=>x.id!==book.id);
+              saveBooks();
+              view = currentTab;
+              renderMain();
+            }
+          });
+          return;
+        }
+        if(action==='start'){ book.status='reading'; }
+        if(action==='done'){
+          // A fresh completion — log it as its own read event, even if this book was read before.
+          const d = todayStr();
+          book.status = 'done';
+          book.dateFinished = d;
+          if(!book.readHistory) book.readHistory = [];
+          book.readHistory.push(d);
+        }
+        if(action==='reopen'){
+          // Only the active read is cleared; past completions in readHistory stay on record.
+          book.status='reading';
+          book.dateFinished=null;
+        }
+        if(action==='toggle-borrowed'){ book.borrowed = !book.borrowed; }
+        saveBooks();
+        renderDetail();
+      });
+    });
+  }
+
+  // ---------- Rendering: Progress ----------
+  function getReadDates(b){
+    if(b.readHistory && b.readHistory.length) return b.readHistory;
+    return b.dateFinished ? [b.dateFinished] : [];
+  }
+  function allReadEvents(){
+    const events = [];
+    books.forEach(b=>{
+      getReadDates(b).forEach(d=> events.push({date:d, book:b}));
+    });
+    return events;
+  }
+
+  function renderProgress(){
+    const main = document.getElementById('main');
+    const events = allReadEvents();
+
+    let html = segmented('progPeriod', [
+      ['month','Month'],['year','Year'],['custom','Custom'],['all','All time']
+    ], progressPeriod);
+
+    let count = 0;
+    let chartData = null; // {labels:[], counts:[]}
+    let periodLabel = '';
+    let listItems = []; // events: {date, book}
+
+    if(progressPeriod === 'month'){
+      html += monthSelectorRow(progressMonth);
+      html += yearSwitch(progressYear);
+      const ym = progressYear + '-' + String(progressMonth+1).padStart(2,'0');
+      periodLabel = new Date(progressYear, progressMonth, 1).toLocaleDateString(undefined,{month:'long', year:'numeric'});
+      listItems = events.filter(e=>e.date.slice(0,7)===ym).sort((a,b)=>b.date.localeCompare(a.date));
+      count = listItems.length;
+    }
+    else if(progressPeriod === 'year'){
+      html += yearSwitch(progressYear);
+      periodLabel = String(progressYear);
+      const counts = new Array(12).fill(0);
+      events.forEach(e=>{
+        const d = new Date(e.date+'T00:00:00');
+        if(d.getFullYear()===progressYear) counts[d.getMonth()]++;
+      });
+      count = counts.reduce((a,c)=>a+c,0);
+      chartData = {labels: MONTH_LABELS, counts};
+      listItems = events.filter(e=> new Date(e.date+'T00:00:00').getFullYear()===progressYear)
+                         .sort((a,b)=>b.date.localeCompare(a.date));
+    }
+    else if(progressPeriod === 'custom'){
+      html += `<div class="custom-range">
+        <div class="field"><label for="fromDate">From</label><input type="date" id="fromDate" value="${customFrom}"></div>
+        <div class="field"><label for="toDate">To</label><input type="date" id="toDate" value="${customTo}"></div>
+      </div>`;
+      if(customFrom && customTo){
+        periodLabel = `${fmtDate(customFrom)} – ${fmtDate(customTo)}`;
+        listItems = events.filter(e=> e.date >= customFrom && e.date <= customTo)
+                           .sort((a,b)=>b.date.localeCompare(a.date));
+        count = listItems.length;
+        chartData = buildMonthlyChart(listItems.map(e=>e.date), customFrom, customTo);
+      } else {
+        periodLabel = 'Choose a date range';
+      }
+    }
+    else if(progressPeriod === 'all'){
+      periodLabel = 'All time';
+      listItems = events.slice().sort((a,b)=>b.date.localeCompare(a.date));
+      count = listItems.length;
+      chartData = buildYearlyChart(events.map(e=>e.date));
+    }
+
+    html += `<div class="stat-hero">
+      <div class="num">${count}</div>
+      <div class="label">book${count===1?'':'s'} finished · ${escapeHtml(periodLabel)}</div>
+      <button class="btn share-progress-btn" id="shareProgressBtn">Share progress</button>
+    </div>`;
+
+    if(chartData && chartData.labels.length){
+      const max = Math.max(1, ...chartData.counts);
+      html += `<div class="chart">${chartData.labels.map((lab,i)=>{
+        const c = chartData.counts[i];
+        const h = Math.round((c/max)*90) + (c>0?10:0);
+        return `<div class="bar-wrap">
+          <div class="bar-count">${c>0?c:''}</div>
+          <div class="bar ${c===0?'zero':''}" style="height:${h}px"></div>
+          <div class="bar-label">${lab}</div>
+        </div>`;
+      }).join('')}</div>`;
+    }
+
+    if(listItems.length){
+      html += `<div class="section-label">Finished in this period</div>`;
+      html += listItems.map(e=>`<div class="finished-item">
+        <div>
+          <div class="ft">${escapeHtml(e.book.title)}</div>
+          ${e.book.author?`<div class="fa">${escapeHtml(e.book.author)}</div>`:''}
+        </div>
+        <div class="fd">${fmtDate(e.date)}</div>
+      </div>`).join('');
+    } else if(progressPeriod !== 'custom' || (customFrom && customTo)){
+      html += `<div class="empty"><div class="glyph">🔖</div><div class="title">Nothing finished yet</div><div class="sub">Mark a book done to see it here.</div></div>`;
+    }
+
+    main.innerHTML = html;
+
+    bindSegmented('progPeriod', v=>{ progressPeriod = v; renderProgress(); });
+    if(progressPeriod === 'month'){
+      document.getElementById('monthSelect').addEventListener('change', e=>{
+        progressMonth = parseInt(e.target.value, 10);
+        renderProgress();
+      });
+    }
+    if(progressPeriod === 'month' || progressPeriod === 'year'){
+      document.getElementById('yrPrev').addEventListener('click', ()=>{ progressYear--; renderProgress(); });
+      document.getElementById('yrNext').addEventListener('click', ()=>{ progressYear++; renderProgress(); });
+    }
+    if(progressPeriod === 'custom'){
+      document.getElementById('fromDate').addEventListener('change', e=>{ customFrom = e.target.value; renderProgress(); });
+      document.getElementById('toDate').addEventListener('change', e=>{ customTo = e.target.value; renderProgress(); });
+    }
+    document.getElementById('shareProgressBtn').addEventListener('click', async ()=>{
+      const canvas = await buildProgressShareCanvas({count, periodLabel, chartData});
+      const safeName = periodLabel.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40).replace(/(^-|-$)/g,'') || 'progress';
+      shareCanvas(canvas, `leebrary-progress-${safeName}.png`, `${count} book${count===1?'':'s'} finished · ${periodLabel} — via Leebrary`);
+    });
+  }
+
+  function buildMonthlyChart(dates, from, to){
+    const start = new Date(from+'T00:00:00');
+    const end = new Date(to+'T00:00:00');
+    const labels = [];
+    const keys = [];
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(end.getFullYear(), end.getMonth(), 1);
+    let guard = 0;
+    while(cur <= last && guard < 36){
+      labels.push(MONTH_LABELS[cur.getMonth()] + (start.getFullYear()!==end.getFullYear() ? " '"+String(cur.getFullYear()).slice(2) : ''));
+      keys.push(cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0'));
+      cur.setMonth(cur.getMonth()+1);
+      guard++;
+    }
+    const counts = keys.map(k => dates.filter(d=>d.slice(0,7)===k).length);
+    return {labels, counts};
+  }
+
+  function buildYearlyChart(dates){
+    if(!dates.length) return {labels:[], counts:[]};
+    const years = dates.map(d=>new Date(d+'T00:00:00').getFullYear());
+    const minY = Math.min(...years), maxY = Math.max(...years);
+    const labels = [], counts = [];
+    for(let y=minY; y<=maxY; y++){
+      labels.push(String(y));
+      counts.push(dates.filter(d=>new Date(d+'T00:00:00').getFullYear()===y).length);
+    }
+    return {labels, counts};
+  }
+
+  function monthSelectorRow(month){
+    const options = MONTH_LABELS.map((lab,i)=>
+      `<option value="${i}" ${i===month?'selected':''}>${lab}</option>`
+    ).join('');
+    return `<div class="month-select-row">
+      <select id="monthSelect" class="month-select">${options}</select>
+    </div>`;
+  }
+
+  function yearSwitch(y){
+    return `<div class="year-switch">
+      <button id="yrPrev">‹</button>
+      <div class="yr">${y}</div>
+      <button id="yrNext">›</button>
+    </div>`;
+  }
+
+  // ---------- Helpers ----------
+  function segmented(name, options, active, scroll){
+    return `<div class="segmented${scroll?' scroll':''}" id="${name}">${options.map(([val,lab])=>
+      `<button data-val="${val}" class="${val===active?'active':''}">${lab}</button>`
+    ).join('')}</div>`;
+  }
+  function bindSegmented(name, onChange){
+    const el = document.getElementById(name);
+    el.querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=> onChange(btn.getAttribute('data-val')));
+    });
+  }
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function escapeAttr(s){ return escapeHtml(s); }
+
+  // ---------- Tab / view switching ----------
+  function renderMain(){
+    document.querySelectorAll('nav.tabbar button').forEach(b=>{
+      b.classList.toggle('active', b.getAttribute('data-tab')===currentTab);
+    });
+    document.getElementById('fabAdd').style.display = (view === 'detail') ? 'none' : 'flex';
+    if(view === 'library') renderLibrary();
+    else if(view === 'progress') renderProgress();
+    else renderDetail();
+  }
+  document.querySelectorAll('nav.tabbar button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      currentTab = btn.getAttribute('data-tab');
+      view = currentTab;
+      renderMain();
+    });
+  });
+
+  // ---------- Add / Edit sheet ----------
+  const sheetBackdrop = document.getElementById('sheetBackdrop');
+  const statusChoice = document.getElementById('statusChoice');
+  const finishedDateField = document.getElementById('finishedDateField');
+  const borrowedSwitch = document.getElementById('borrowedSwitch');
+  const coverInput = document.getElementById('fCover');
+  const coverPreviewWrap = document.getElementById('coverPreviewWrap');
+  const coverPreview = document.getElementById('coverPreview');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const removeCoverBtn = document.getElementById('removeCoverBtn');
+  const ratingPicker = document.getElementById('ratingPicker');
+  let formStatus = 'to-read';
+  let formBorrowed = false;
+  let formCover = null;
+  let formRating = 0;
+
+  function openSheet(book){
+    editingId = book ? book.id : null;
+    document.getElementById('sheetTitle').textContent = book ? 'Edit book' : 'Add a book';
+    document.getElementById('fTitle').value = book ? book.title : '';
+    document.getElementById('fAuthor').value = book ? (book.author||'') : '';
+    document.getElementById('fFinished').value = (book && book.dateFinished) ? book.dateFinished : todayStr();
+    document.getElementById('fReview').value = book ? (book.review || '') : '';
+    formStatus = book ? book.status : 'to-read';
+    formBorrowed = book ? !!book.borrowed : false;
+    formCover = book ? (book.cover || null) : null;
+    formRating = book ? (book.rating || 0) : 0;
+    coverInput.value = '';
+    updateStatusChoiceUI();
+    updateBorrowedUI();
+    updateCoverUI();
+    updateRatingUI();
+    sheetBackdrop.classList.add('open');
+    setTimeout(()=>document.getElementById('fTitle').focus(), 50);
+  }
+  function closeSheet(){ sheetBackdrop.classList.remove('open'); }
+
+  function updateStatusChoiceUI(){
+    statusChoice.querySelectorAll('button').forEach(b=>{
+      b.classList.toggle('active', b.getAttribute('data-status')===formStatus);
+    });
+    finishedDateField.style.display = formStatus==='done' ? 'block' : 'none';
+  }
+  function updateBorrowedUI(){
+    borrowedSwitch.classList.toggle('on', formBorrowed);
+  }
+  function updateCoverUI(){
+    if(formCover){
+      coverPreview.src = formCover;
+      coverPreviewWrap.style.display = 'flex';
+      uploadBtn.style.display = 'none';
+    } else {
+      coverPreviewWrap.style.display = 'none';
+      uploadBtn.style.display = 'inline-block';
+    }
+  }
+  function updateRatingUI(){
+    ratingPicker.querySelectorAll('.star-btn').forEach(btn=>{
+      btn.classList.toggle('filled', parseInt(btn.getAttribute('data-val'),10) <= formRating);
+    });
+  }
+
+  // Resize/compress a chosen photo client-side before it's stored, so covers stay small.
+  function resizeImageFile(file, maxDim, quality){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Could not read image'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Could not load image'));
+        img.onload = () => {
+          let { width, height } = img;
+          if(width > height){
+            if(width > maxDim){ height = Math.round(height * (maxDim/width)); width = maxDim; }
+          } else {
+            if(height > maxDim){ width = Math.round(width * (maxDim/height)); height = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  coverInput.addEventListener('change', async ()=>{
+    const file = coverInput.files && coverInput.files[0];
+    if(!file) return;
+    try{
+      formCover = await resizeImageFile(file, 320, 0.72);
+      updateCoverUI();
+    }catch(e){
+      showConfirm('That photo could not be loaded. Try a different one.', { confirmLabel:'OK', cancelLabel:null });
+    }
+  });
+  removeCoverBtn.addEventListener('click', ()=>{
+    formCover = null;
+    coverInput.value = '';
+    updateCoverUI();
+  });
+
+  statusChoice.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      formStatus = btn.getAttribute('data-status');
+      updateStatusChoiceUI();
+    });
+  });
+  borrowedSwitch.addEventListener('click', ()=>{
+    formBorrowed = !formBorrowed;
+    updateBorrowedUI();
+  });
+  ratingPicker.querySelectorAll('.star-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const v = parseInt(btn.getAttribute('data-val'),10);
+      formRating = (formRating === v) ? 0 : v;
+      updateRatingUI();
+    });
+  });
+
+  document.getElementById('fabAdd').addEventListener('click', ()=>openSheet());
+  document.getElementById('cancelSheet').addEventListener('click', closeSheet);
+  sheetBackdrop.addEventListener('click', e=>{ if(e.target===sheetBackdrop) closeSheet(); });
+
+  document.getElementById('saveSheet').addEventListener('click', async ()=>{
+    const title = document.getElementById('fTitle').value.trim();
+    if(!title){ document.getElementById('fTitle').focus(); return; }
+    const author = document.getElementById('fAuthor').value.trim();
+    if(!author){ document.getElementById('fAuthor').focus(); return; }
+    const review = document.getElementById('fReview').value.trim();
+    const finished = document.getElementById('fFinished').value || todayStr();
+
+    if(editingId){
+      const book = books.find(x=>x.id===editingId);
+      if(book){
+        const wasDone = book.status === 'done';
+        book.title = title;
+        book.author = author;
+        book.status = formStatus;
+        book.borrowed = formBorrowed;
+        book.cover = formCover;
+        book.rating = formRating;
+        book.review = review;
+        if(!book.readHistory) book.readHistory = [];
+        if(formStatus === 'done'){
+          if(wasDone && book.readHistory.length){
+            // Still the same completion — just correcting its date, not logging a new read.
+            book.readHistory[book.readHistory.length-1] = finished;
+          } else {
+            // Newly marked done from this edit — a fresh read event.
+            book.readHistory.push(finished);
+          }
+          book.dateFinished = finished;
+        } else {
+          book.dateFinished = null;
+        }
+      }
+      view = 'detail';
+    } else {
+      books.push({
+        id: uid(),
+        title,
+        author,
+        status: formStatus,
+        borrowed: formBorrowed,
+        cover: formCover,
+        rating: formRating,
+        review: review,
+        dateAdded: todayStr(),
+        dateFinished: formStatus==='done' ? finished : null,
+        readHistory: formStatus==='done' ? [finished] : []
+      });
+      view = currentTab;
+    }
+    await saveBooks();
+    closeSheet();
+    renderMain();
+  });
+
+  // ---------- Filters sheet ----------
+  const filtersBackdrop = document.getElementById('filtersBackdrop');
+  const statusChipGroup = document.getElementById('statusChipGroup');
+  const ownerChipGroup = document.getElementById('ownerChipGroup');
+  const ratingChipGroup = document.getElementById('ratingChipGroup');
+  const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+
+  function matchCountWithCurrentToggles(){
+    return books.filter(b=>{
+      if(!bookMatchesFilters(b)) return false;
+      if(searchTerm){
+        const t = (b.title+' '+b.author).toLowerCase();
+        if(!t.includes(searchTerm.toLowerCase())) return false;
+      }
+      return true;
+    }).length;
+  }
+  function updateFilterChipsUI(){
+    statusChipGroup.querySelectorAll('button').forEach(b=>{
+      b.classList.toggle('active', statusFilters.has(b.getAttribute('data-val')));
+    });
+    ownerChipGroup.querySelectorAll('button').forEach(b=>{
+      b.classList.toggle('active', ownerFilters.has(b.getAttribute('data-val')));
+    });
+    ratingChipGroup.querySelectorAll('button').forEach(b=>{
+      b.classList.toggle('active', ratingFilters.has(parseInt(b.getAttribute('data-val'),10)));
+    });
+    const n = matchCountWithCurrentToggles();
+    applyFiltersBtn.textContent = `Show ${n} book${n===1?'':'s'}`;
+  }
+  function openFilters(){
+    updateFilterChipsUI();
+    filtersBackdrop.classList.add('open');
+  }
+  function closeFilters(){ filtersBackdrop.classList.remove('open'); }
+
+  statusChipGroup.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const v = btn.getAttribute('data-val');
+      if(statusFilters.has(v)) statusFilters.delete(v); else statusFilters.add(v);
+      updateFilterChipsUI();
+    });
+  });
+  ownerChipGroup.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const v = btn.getAttribute('data-val');
+      if(ownerFilters.has(v)) ownerFilters.delete(v); else ownerFilters.add(v);
+      updateFilterChipsUI();
+    });
+  });
+  ratingChipGroup.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const v = parseInt(btn.getAttribute('data-val'),10);
+      if(ratingFilters.has(v)) ratingFilters.delete(v); else ratingFilters.add(v);
+      updateFilterChipsUI();
+    });
+  });
+  document.getElementById('clearFiltersBtn').addEventListener('click', ()=>{
+    statusFilters.clear();
+    ownerFilters.clear();
+    ratingFilters.clear();
+    updateFilterChipsUI();
+  });
+  applyFiltersBtn.addEventListener('click', ()=>{
+    closeFilters();
+    renderLibrary();
+  });
+  filtersBackdrop.addEventListener('click', e=>{ if(e.target===filtersBackdrop) closeFilters(); });
+
+  // ---------- Confirm / alert modal ----------
+  // Native confirm()/alert() are blocked inside this sandboxed frame, so we
+  // use our own small modal for anything that needs a yes/no or an OK.
+  const confirmBackdrop = document.getElementById('confirmBackdrop');
+  const confirmMessage = document.getElementById('confirmMessage');
+  const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+  const confirmOkBtn = document.getElementById('confirmOkBtn');
+  let confirmCallback = null;
+
+  function showConfirm(message, opts){
+    opts = opts || {};
+    confirmMessage.textContent = message;
+    confirmOkBtn.textContent = opts.confirmLabel || 'Remove';
+    if(opts.cancelLabel === null){
+      confirmCancelBtn.style.display = 'none';
+    } else {
+      confirmCancelBtn.style.display = 'inline-block';
+      confirmCancelBtn.textContent = opts.cancelLabel || 'Cancel';
+    }
+    confirmCallback = opts.onConfirm || null;
+    confirmBackdrop.classList.add('open');
+  }
+  function closeConfirmModal(){
+    confirmBackdrop.classList.remove('open');
+    confirmCallback = null;
+  }
+  confirmCancelBtn.addEventListener('click', closeConfirmModal);
+  confirmOkBtn.addEventListener('click', ()=>{
+    const cb = confirmCallback;
+    closeConfirmModal();
+    if(cb) cb();
+  });
+  confirmBackdrop.addEventListener('click', e=>{ if(e.target===confirmBackdrop) closeConfirmModal(); });
+
+  // ---------- Share images ----------
+  const shareBackdrop = document.getElementById('shareBackdrop');
+  const sharePreviewImg = document.getElementById('sharePreviewImg');
+  const shareDownloadBtn = document.getElementById('shareDownloadBtn');
+  let currentShareUrl = null;
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  function roundRectPath(ctx, x, y, w, h, r){
+    r = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+  function loadImageEl(src){
+    return new Promise((resolve, reject)=>{
+      const img = new Image();
+      img.onload = ()=>resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+  // Wraps text to maxWidth (word-based), draws it centered on centerX starting at startY,
+  // truncating with an ellipsis past maxLines. Returns the vertical space used.
+  function drawWrappedCentered(ctx, text, centerX, startY, maxWidth, lineHeight, maxLines){
+    const words = String(text).split(/\s+/).filter(Boolean);
+    let lines = [];
+    let line = '';
+    words.forEach(w=>{
+      const test = line ? line+' '+w : w;
+      if(ctx.measureText(test).width > maxWidth && line){
+        lines.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+    });
+    if(line) lines.push(line);
+    if(maxLines && lines.length > maxLines){
+      lines = lines.slice(0, maxLines);
+      let last = lines[maxLines-1];
+      while(last.length > 1 && ctx.measureText(last+'…').width > maxWidth){
+        last = last.slice(0, -1);
+      }
+      lines[maxLines-1] = last + '…';
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    lines.forEach((l,i)=> ctx.fillText(l, centerX, startY + i*lineHeight));
+    return lines.length * lineHeight;
+  }
+  function drawStarsCanvas(ctx, rating, centerX, y, size){
+    const spacing = size * 1.2;
+    const startX = centerX - (spacing*4)/2;
+    ctx.font = `${size}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for(let i=0;i<5;i++){
+      ctx.fillStyle = (i < rating) ? cssVar('--brass') : cssVar('--line');
+      ctx.fillText('★', startX + i*spacing, y);
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+  function drawPillsRow(ctx, pills, centerX, y, fontSize){
+    const paddingX = 26, gap = 16, h = fontSize + 26;
+    ctx.font = `700 ${fontSize}px Inter, sans-serif`;
+    const widths = pills.map(p=> ctx.measureText(p.text).width + paddingX*2);
+    const totalW = widths.reduce((a,w)=>a+w,0) + gap*(pills.length-1);
+    let x = centerX - totalW/2;
+    pills.forEach((p,i)=>{
+      const w = widths[i];
+      roundRectPath(ctx, x, y-h/2, w, h, h/2);
+      ctx.fillStyle = p.bg;
+      ctx.fill();
+      ctx.fillStyle = p.fg;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.text, x+w/2, y+1);
+      x += w + gap;
+    });
+    ctx.textBaseline = 'alphabetic';
+    return h;
+  }
+  function drawWordmark(ctx, centerX, y, fontSize){
+    ctx.font = `700 ${fontSize}px "Source Serif 4", serif`;
+    ctx.textBaseline = 'alphabetic';
+    const leeW = ctx.measureText('Lee').width;
+    const braryW = ctx.measureText('brary').width;
+    let x = centerX - (leeW+braryW)/2;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = cssVar('--spine');
+    ctx.fillText('Lee', x, y);
+    x += leeW;
+    ctx.fillStyle = cssVar('--ink');
+    ctx.fillText('brary', x, y);
+    ctx.textAlign = 'center';
+  }
+
+  async function buildBookShareCanvas(b){
+    if(document.fonts && document.fonts.ready){ try{ await document.fonts.ready; }catch(e){} }
+    const W = 1080, H = 1350;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    const paper = cssVar('--paper'), ink = cssVar('--ink'), inkSoft = cssVar('--ink-soft'),
+          spine = cssVar('--spine'), spineDeep = cssVar('--spine-deep'),
+          leather = cssVar('--leather'), leatherBg = cssVar('--leather-bg'),
+          brass = cssVar('--brass'), brassBg = cssVar('--brass-bg');
+
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+
+    drawWordmark(ctx, W/2, 110, 42);
+
+    let cursorY = 210;
+    const coverW = 320, coverH = 452;
+    const coverX = W/2 - coverW/2;
+    if(b.cover){
+      try{
+        const img = await loadImageEl(b.cover);
+        ctx.save();
+        roundRectPath(ctx, coverX, cursorY, coverW, coverH, 16);
+        ctx.clip();
+        ctx.drawImage(img, coverX, cursorY, coverW, coverH);
+        ctx.restore();
+      }catch(e){ /* skip cover if it fails to load */ }
+    } else {
+      const grad = ctx.createLinearGradient(coverX, cursorY, coverX+coverW, cursorY+coverH);
+      grad.addColorStop(0, spine);
+      grad.addColorStop(1, spineDeep);
+      roundRectPath(ctx, coverX, cursorY, coverW, coverH, 16);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.font = '150px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('📕', W/2, cursorY + coverH/2 + 12);
+      ctx.textBaseline = 'alphabetic';
+    }
+    cursorY += coverH + 66;
+
+    ctx.fillStyle = ink;
+    ctx.font = '700 54px "Source Serif 4", serif';
+    cursorY += drawWrappedCentered(ctx, b.title, W/2, cursorY, W-220, 64, 3);
+    cursorY += 6;
+
+    if(b.author){
+      ctx.font = '500 34px Inter, sans-serif';
+      ctx.fillStyle = inkSoft;
+      ctx.fillText(b.author, W/2, cursorY);
+      cursorY += 58;
+    } else {
+      cursorY += 22;
+    }
+
+    const statusLabel = STATUS_LABELS[b.status];
+    const pills = [];
+    if(b.status === 'to-read') pills.push({text: statusLabel, bg:'#ECD9D3', fg: inkSoft});
+    else if(b.status === 'reading') pills.push({text: statusLabel, bg: spine, fg:'#fff'});
+    else pills.push({text: statusLabel, bg: leatherBg, fg: leather});
+    if(b.borrowed) pills.push({text:'Borrowed', bg: brassBg, fg: brass});
+    else pills.push({text:'Owned', bg:'#EDE2EC', fg: spineDeep});
+    drawPillsRow(ctx, pills, W/2, cursorY, 26);
+    cursorY += 66;
+
+    if(b.rating){
+      drawStarsCanvas(ctx, b.rating, W/2, cursorY, 44);
+      cursorY += 64;
+    }
+
+    if(b.review){
+      cursorY += 18;
+      ctx.font = 'italic 400 32px "Source Serif 4", serif';
+      ctx.fillStyle = ink;
+      drawWrappedCentered(ctx, `“${b.review}”`, W/2, cursorY, W-260, 46, 5);
+    }
+
+    ctx.font = '500 26px Inter, sans-serif';
+    ctx.fillStyle = inkSoft;
+    ctx.fillText('Shared from Leebrary', W/2, H-64);
+
+    return canvas;
+  }
+
+  async function buildProgressShareCanvas(data){
+    if(document.fonts && document.fonts.ready){ try{ await document.fonts.ready; }catch(e){} }
+    const W = 1080, H = 1080;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    const paper = cssVar('--paper'), ink = cssVar('--ink'), inkSoft = cssVar('--ink-soft'),
+          spine = cssVar('--spine'), spineDeep = cssVar('--spine-deep'), line = cssVar('--line');
+
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+
+    drawWordmark(ctx, W/2, 120, 44);
+
+    ctx.font = '700 220px "Source Serif 4", serif';
+    ctx.fillStyle = spineDeep;
+    ctx.fillText(String(data.count), W/2, 470);
+
+    ctx.font = '600 40px Inter, sans-serif';
+    ctx.fillStyle = ink;
+    ctx.fillText(`book${data.count===1?'':'s'} finished`, W/2, 530);
+
+    ctx.font = '500 32px Inter, sans-serif';
+    ctx.fillStyle = inkSoft;
+    ctx.fillText(data.periodLabel, W/2, 575);
+
+    if(data.chartData && data.chartData.labels && data.chartData.labels.length){
+      const labels = data.chartData.labels, counts = data.chartData.counts;
+      const max = Math.max(1, ...counts);
+      const chartTop = 660, chartBottom = 900, chartLeft = 90, chartRight = W-90;
+      const n = labels.length;
+      const gap = Math.max(6, 16 - n);
+      const barW = (chartRight - chartLeft - gap*(n-1)) / n;
+      labels.forEach((lab,i)=>{
+        const c = counts[i];
+        const h = Math.max(4, (c/max) * (chartBottom-chartTop));
+        const x = chartLeft + i*(barW+gap);
+        const y = chartBottom - h;
+        roundRectPath(ctx, x, y, barW, h, Math.min(6, barW/2));
+        ctx.fillStyle = c > 0 ? spine : line;
+        ctx.fill();
+        if(c > 0 && barW > 14){
+          ctx.font = '600 20px Inter, sans-serif';
+          ctx.fillStyle = inkSoft;
+          ctx.fillText(String(c), x+barW/2, y-10);
+        }
+        if(barW > 10){
+          ctx.font = '500 18px Inter, sans-serif';
+          ctx.fillStyle = inkSoft;
+          ctx.fillText(lab, x+barW/2, chartBottom+30);
+        }
+      });
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(chartLeft, chartBottom);
+      ctx.lineTo(chartRight, chartBottom);
+      ctx.stroke();
+    }
+
+    ctx.font = '500 26px Inter, sans-serif';
+    ctx.fillStyle = inkSoft;
+    ctx.fillText('Shared from Leebrary', W/2, H-60);
+
+    return canvas;
+  }
+
+  function showSharePreview(url, filename){
+    if(currentShareUrl) URL.revokeObjectURL(currentShareUrl);
+    currentShareUrl = url;
+    sharePreviewImg.src = url;
+    shareDownloadBtn.href = url;
+    shareDownloadBtn.setAttribute('download', filename);
+    shareBackdrop.classList.add('open');
+  }
+  function closeSharePreview(){
+    shareBackdrop.classList.remove('open');
+  }
+  document.getElementById('shareCloseBtn').addEventListener('click', closeSharePreview);
+  shareBackdrop.addEventListener('click', e=>{ if(e.target===shareBackdrop) closeSharePreview(); });
+
+  function shareCanvas(canvas, filename, shareText){
+    canvas.toBlob(async (blob)=>{
+      if(!blob) return;
+      try{
+        const file = new File([blob], filename, {type:'image/png'});
+        if(navigator.canShare && navigator.canShare({files:[file]})){
+          await navigator.share({files:[file], title:'Leebrary', text: shareText});
+          return;
+        }
+      }catch(e){
+        // User cancelled the share sheet, or the browser refused — fall back to preview/download.
+      }
+      const url = URL.createObjectURL(blob);
+      showSharePreview(url, filename);
+    }, 'image/png');
+  }
+
+  // ---------- Init ----------
+  (async function init(){
+    await loadBooks();
+    renderMain();
+  })();
+})();
+</script>
+</body>
+</html>
