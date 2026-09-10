@@ -141,6 +141,23 @@
     padding:15px;
     font-size:15px;
   }
+  .password-field-wrap{ position:relative; }
+  .password-field-wrap input{ padding-right:46px !important; }
+  .password-toggle-btn{
+    position:absolute;
+    top:50%;
+    right:6px;
+    transform:translateY(-50%);
+    background:transparent;
+    border:none;
+    color:var(--ink-soft);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:32px;
+    height:32px;
+    cursor:pointer;
+  }
   .auth-error{
     background:var(--tag-red-bg);
     color:var(--tag-red);
@@ -150,18 +167,32 @@
     line-height:1.4;
     margin-bottom:14px;
   }
-  #authToggleModeBtn{
+  #authToggleModeBtn, .auth-link-btn{
     background:transparent;
     border:none;
     color:var(--ink-soft);
     text-decoration:underline;
+    font-size:12.5px;
+    display:block;
+    margin:0 auto;
+    padding:6px;
+    cursor:pointer;
   }
   .header-icons{
     display:flex;
     align-items:center;
     gap:8px;
   }
-  .profile-menu-wrap{ position:relative; }
+  .profile-menu-wrap{ position:relative; display:flex; align-items:center; gap:8px; }
+  .profile-name-label{
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink);
+    max-width:110px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
   .profile-avatar-img{
     width:100%;
     height:100%;
@@ -225,6 +256,26 @@
     color:var(--ink-soft);
     font-size:13.5px;
   }
+  .crop-viewport{
+    width:220px;
+    height:220px;
+    margin:0 auto 16px;
+    border-radius:50%;
+    overflow:hidden;
+    background:var(--paper-deep);
+    position:relative;
+    touch-action:none;
+    cursor:grab;
+  }
+  .crop-viewport img{
+    position:absolute;
+    top:0;
+    left:0;
+    user-select:none;
+    -webkit-user-drag:none;
+    pointer-events:none;
+  }
+  #cropZoomSlider{ width:100%; margin-bottom:6px; }
   .header-icon-btn{
     border:1px solid var(--line);
     background:var(--card);
@@ -1317,11 +1368,40 @@
     </div>
     <div class="field">
       <label for="authPassword">Password</label>
-      <input type="password" id="authPassword" placeholder="At least 6 characters" autocomplete="current-password">
+      <div class="password-field-wrap">
+        <input type="password" id="authPassword" placeholder="At least 6 characters" autocomplete="current-password">
+        <button type="button" class="password-toggle-btn" id="authPasswordToggle" title="Show password" tabindex="-1">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+      </div>
     </div>
     <div class="auth-error" id="authError" style="display:none;"></div>
     <button class="btn primary settings-action-btn" id="authSubmitBtn">Log in</button>
+    <button type="button" class="auth-link-btn" id="forgotPasswordBtn">Forgot password?</button>
     <button class="btn settings-action-btn" id="authToggleModeBtn">Need an account? Sign up</button>
+  </div>
+</div>
+<div id="resetPasswordScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-wordmark"><span class="script">Lee</span>brary</div>
+    <div class="auth-subtitle">Set a new password for <strong id="resetEmailLabel"></strong></div>
+    <div class="field">
+      <label for="resetNewPassword">New password</label>
+      <div class="password-field-wrap">
+        <input type="password" id="resetNewPassword" placeholder="At least 6 characters" autocomplete="new-password">
+        <button type="button" class="password-toggle-btn" id="resetPasswordToggle" title="Show password" tabindex="-1">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="auth-error" id="resetError" style="display:none;"></div>
+    <button class="btn primary settings-action-btn" id="resetConfirmBtn">Set new password</button>
   </div>
 </div>
 <div id="app">
@@ -1333,6 +1413,7 @@
     </div>
     <div class="header-icons">
       <div class="profile-menu-wrap">
+        <span class="profile-name-label" id="profileNameLabel" style="display:none;"></span>
         <button class="header-icon-btn" id="profileBtn" title="Account">
           <img id="profileAvatarImg" class="profile-avatar-img" style="display:none;" alt="">
           <svg id="profileDefaultIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1545,6 +1626,20 @@
       <button class="btn settings-action-btn" id="changePasswordBtn">Change password</button>
       <div class="sheet-actions">
         <button class="btn" id="closeAccountBtn" style="flex:1;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="cropBackdrop">
+    <div class="sheet crop-sheet">
+      <h2>Crop photo</h2>
+      <div class="crop-viewport" id="cropViewport">
+        <img id="cropImage" alt="" draggable="false">
+      </div>
+      <input type="range" id="cropZoomSlider" min="1" max="3" step="0.01" value="1">
+      <div class="sheet-actions">
+        <button class="btn" id="cropCancelBtn">Cancel</button>
+        <button class="btn primary" id="cropUseBtn">Use photo</button>
       </div>
     </div>
   </div>
@@ -1791,6 +1886,7 @@
   // Each signed-in user's data lives at users/{uid}/library/{books|wishlist|loans},
   // one document per array (simple and cheap to keep in sync; fine for a personal
   // library's size/cover-image weight — see the PRD for the size trade-off this implies).
+  let profilePhotoDataUri = null;
   function attachCloudListeners(uid){
     detachCloudListeners();
     const libRef = db.collection('users').doc(uid).collection('library');
@@ -1806,6 +1902,14 @@
       loans = (snap.exists && Array.isArray(snap.data().loans)) ? snap.data().loans : [];
       renderMain();
     }, e=> console.error('loans listener error', e)));
+    // Profile photo lives on the user's own root doc (users/{uid}), separate from the
+    // library subcollection — kept out of Firebase Auth's photoURL field entirely,
+    // since that field has a length limit far too small for an embedded image.
+    cloudUnsubscribers.push(db.collection('users').doc(uid).onSnapshot(snap=>{
+      profilePhotoDataUri = (snap.exists && snap.data().photoDataUri) ? snap.data().photoDataUri : null;
+      updateProfileHeaderUI(currentUser);
+      if(accountBackdrop.classList.contains('open')) refreshAccountAvatarUI();
+    }, e=> console.error('profile listener error', e)));
   }
   function detachCloudListeners(){
     cloudUnsubscribers.forEach(unsub=>unsub());
@@ -1872,6 +1976,75 @@
   });
   updateAuthModeUI();
 
+  function wirePasswordToggle(inputId, btnId){
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById(btnId);
+    btn.addEventListener('click', ()=>{
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.title = showing ? 'Show password' : 'Hide password';
+      btn.innerHTML = showing
+        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`
+        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.6 18.6 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+    });
+  }
+  wirePasswordToggle('authPassword', 'authPasswordToggle');
+  wirePasswordToggle('resetNewPassword', 'resetPasswordToggle');
+
+  // ---------- Forgot password ----------
+  document.getElementById('forgotPasswordBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('authEmail').value.trim();
+    if(!email){ setAuthError('Enter your email above first, then tap "Forgot password?" again.'); return; }
+    setAuthError(null);
+    try{
+      await auth.sendPasswordResetEmail(email);
+      showConfirm(`Password reset email sent to ${email} — check your inbox for the link.`, { confirmLabel:'OK', cancelLabel:null });
+    }catch(e){
+      setAuthError(e.message || 'Could not send reset email.');
+    }
+  });
+
+  // ---------- "Set new password" screen (opened via the link in the reset email) ----------
+  // The reset link's action URL is configured in Firebase Console to point back at
+  // this app (rather than Firebase's own generic hosted page), landing here with
+  // ?mode=resetPassword&oobCode=... in the query string. We handle the whole thing
+  // in-app — no Firebase Hosting required for this flow.
+  const resetPasswordScreen = document.getElementById('resetPasswordScreen');
+  function checkForPasswordResetLink(){
+    const params = new URLSearchParams(window.location.search);
+    if(params.get('mode') !== 'resetPassword' || !params.get('oobCode')) return;
+    const oobCode = params.get('oobCode');
+    auth.verifyPasswordResetCode(oobCode).then(email=>{
+      document.getElementById('resetEmailLabel').textContent = email;
+      hideAuthScreen();
+      resetPasswordScreen.classList.add('open');
+      document.getElementById('resetConfirmBtn').onclick = async ()=>{
+        const newPassword = document.getElementById('resetNewPassword').value;
+        const errEl = document.getElementById('resetError');
+        if(!newPassword || newPassword.length < 6){
+          errEl.textContent = 'Password must be at least 6 characters.';
+          errEl.style.display = 'block';
+          return;
+        }
+        errEl.style.display = 'none';
+        try{
+          await auth.confirmPasswordReset(oobCode, newPassword);
+          resetPasswordScreen.classList.remove('open');
+          window.history.replaceState({}, '', window.location.pathname);
+          showAuthScreen();
+          showConfirm('Password updated — you can now log in with your new password.', { confirmLabel:'OK', cancelLabel:null });
+        }catch(e){
+          errEl.textContent = e.message || 'Could not reset password — the link may have expired.';
+          errEl.style.display = 'block';
+        }
+      };
+    }).catch(e=>{
+      window.history.replaceState({}, '', window.location.pathname);
+      showConfirm(e.message || 'This password reset link is invalid or has expired.', { confirmLabel:'OK', cancelLabel:null });
+    });
+  }
+  checkForPasswordResetLink();
+
   const profileDropdown = document.getElementById('profileDropdown');
   document.getElementById('profileBtn').addEventListener('click', (e)=>{
     e.stopPropagation();
@@ -1890,29 +2063,40 @@
   function updateProfileHeaderUI(user){
     const img = document.getElementById('profileAvatarImg');
     const placeholder = document.getElementById('profileDefaultIcon');
-    if(user && user.photoURL){
-      img.src = user.photoURL;
+    if(profilePhotoDataUri){
+      img.src = profilePhotoDataUri;
       img.style.display = 'block';
       placeholder.style.display = 'none';
     } else {
       img.style.display = 'none';
       placeholder.style.display = 'block';
     }
+    const label = document.getElementById('profileNameLabel');
+    if(user && user.displayName){
+      label.textContent = user.displayName;
+      label.style.display = 'block';
+    } else {
+      label.textContent = '';
+      label.style.display = 'none';
+    }
   }
 
   // ---------- My Account sheet ----------
   const accountBackdrop = document.getElementById('accountBackdrop');
+  function refreshAccountAvatarUI(){
+    const img = document.getElementById('accountAvatarImg');
+    const placeholder = document.getElementById('accountAvatarPlaceholder');
+    if(profilePhotoDataUri){
+      img.src = profilePhotoDataUri; img.style.display = 'block'; placeholder.style.display = 'none';
+    } else {
+      img.style.display = 'none'; placeholder.style.display = 'block';
+    }
+  }
   function openAccountSheet(){
     if(!currentUser) return;
     document.getElementById('accountNameInput').value = currentUser.displayName || '';
     document.getElementById('accountEmailReadonly').textContent = currentUser.email || '';
-    const img = document.getElementById('accountAvatarImg');
-    const placeholder = document.getElementById('accountAvatarPlaceholder');
-    if(currentUser.photoURL){
-      img.src = currentUser.photoURL; img.style.display = 'block'; placeholder.style.display = 'none';
-    } else {
-      img.style.display = 'none'; placeholder.style.display = 'block';
-    }
+    refreshAccountAvatarUI();
     // Google-only accounts have no password to change — hide that action for them.
     const isPasswordUser = currentUser.providerData.some(p=>p.providerId==='password');
     document.getElementById('changePasswordBtn').style.display = isPasswordUser ? 'block' : 'none';
@@ -1925,20 +2109,11 @@
   document.getElementById('closeAccountBtn').addEventListener('click', ()=> accountBackdrop.classList.remove('open'));
   accountBackdrop.addEventListener('click', e=>{ if(e.target===accountBackdrop) accountBackdrop.classList.remove('open'); });
 
-  document.getElementById('accountAvatarInput').addEventListener('change', async ()=>{
+  document.getElementById('accountAvatarInput').addEventListener('change', ()=>{
     const input = document.getElementById('accountAvatarInput');
     const file = input.files && input.files[0];
-    if(!file || !currentUser) return;
-    try{
-      const dataUri = await resizeImageFile(file, 160, 0.75);
-      await currentUser.updateProfile({ photoURL: dataUri });
-      const img = document.getElementById('accountAvatarImg');
-      const placeholder = document.getElementById('accountAvatarPlaceholder');
-      img.src = dataUri; img.style.display = 'block'; placeholder.style.display = 'none';
-      updateProfileHeaderUI(currentUser);
-    }catch(e){
-      showConfirm('That photo could not be used. Try a different one.', { confirmLabel:'OK', cancelLabel:null });
-    }
+    if(!file) return;
+    openCropSheet(file);
     input.value = '';
   });
 
@@ -1970,6 +2145,123 @@
     });
   });
 
+  // ---------- Photo crop sheet ----------
+  // A lightweight drag-to-reposition + zoom-slider cropper: the source image is
+  // rendered oversized inside a circular viewport, positioned/scaled with plain
+  // left/top/width/height (not CSS transforms) so the math mapping screen pixels
+  // back to source-image pixels for the final canvas crop stays simple.
+  const cropBackdrop = document.getElementById('cropBackdrop');
+  const cropViewport = document.getElementById('cropViewport');
+  const cropImageEl = document.getElementById('cropImage');
+  const cropZoomSlider = document.getElementById('cropZoomSlider');
+  const CROP_VIEWPORT_SIZE = 220;
+  const CROP_OUTPUT_SIZE = 200;
+  let cropNaturalW = 0, cropNaturalH = 0, cropBaseScale = 1, cropZoom = 1;
+  let cropOffsetX = 0, cropOffsetY = 0;
+  let cropDragging = false, cropDragStartX = 0, cropDragStartY = 0, cropStartOffsetX = 0, cropStartOffsetY = 0;
+
+  function clampCropOffsets(){
+    const totalScale = cropBaseScale * cropZoom;
+    const w = cropNaturalW * totalScale, h = cropNaturalH * totalScale;
+    cropOffsetX = Math.min(0, Math.max(CROP_VIEWPORT_SIZE - w, cropOffsetX));
+    cropOffsetY = Math.min(0, Math.max(CROP_VIEWPORT_SIZE - h, cropOffsetY));
+  }
+  function applyCropTransform(){
+    const totalScale = cropBaseScale * cropZoom;
+    cropImageEl.style.width = (cropNaturalW * totalScale) + 'px';
+    cropImageEl.style.height = (cropNaturalH * totalScale) + 'px';
+    cropImageEl.style.left = cropOffsetX + 'px';
+    cropImageEl.style.top = cropOffsetY + 'px';
+  }
+  function openCropSheet(file){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      cropImageEl.onload = ()=>{
+        cropNaturalW = cropImageEl.naturalWidth;
+        cropNaturalH = cropImageEl.naturalHeight;
+        // "Cover" fit: the smaller-relative dimension is scaled up to fill the
+        // circular viewport completely, so there's never empty space at zoom 1.
+        cropBaseScale = Math.max(CROP_VIEWPORT_SIZE / cropNaturalW, CROP_VIEWPORT_SIZE / cropNaturalH);
+        cropZoom = 1;
+        cropZoomSlider.value = '1';
+        cropOffsetX = (CROP_VIEWPORT_SIZE - cropNaturalW * cropBaseScale) / 2;
+        cropOffsetY = (CROP_VIEWPORT_SIZE - cropNaturalH * cropBaseScale) / 2;
+        applyCropTransform();
+        cropBackdrop.classList.add('open');
+      };
+      cropImageEl.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  function closeCropSheet(){ cropBackdrop.classList.remove('open'); }
+  document.getElementById('cropCancelBtn').addEventListener('click', closeCropSheet);
+  cropBackdrop.addEventListener('click', e=>{ if(e.target===cropBackdrop) closeCropSheet(); });
+
+  cropZoomSlider.addEventListener('input', ()=>{
+    const newZoom = parseFloat(cropZoomSlider.value);
+    const oldTotalScale = cropBaseScale * cropZoom;
+    const newTotalScale = cropBaseScale * newZoom;
+    const center = CROP_VIEWPORT_SIZE / 2;
+    // Keep whatever image point is currently at the viewport's center fixed there
+    // as the scale changes, so zooming feels like it's anchored to the middle.
+    const imgX = (center - cropOffsetX) / oldTotalScale;
+    const imgY = (center - cropOffsetY) / oldTotalScale;
+    cropZoom = newZoom;
+    cropOffsetX = center - imgX * newTotalScale;
+    cropOffsetY = center - imgY * newTotalScale;
+    clampCropOffsets();
+    applyCropTransform();
+  });
+
+  function cropPointerDown(x, y){
+    cropDragging = true;
+    cropDragStartX = x; cropDragStartY = y;
+    cropStartOffsetX = cropOffsetX; cropStartOffsetY = cropOffsetY;
+    cropViewport.style.cursor = 'grabbing';
+  }
+  function cropPointerMove(x, y){
+    if(!cropDragging) return;
+    cropOffsetX = cropStartOffsetX + (x - cropDragStartX);
+    cropOffsetY = cropStartOffsetY + (y - cropDragStartY);
+    clampCropOffsets();
+    applyCropTransform();
+  }
+  function cropPointerUp(){
+    cropDragging = false;
+    cropViewport.style.cursor = 'grab';
+  }
+  cropViewport.addEventListener('mousedown', e=>{ e.preventDefault(); cropPointerDown(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e=> cropPointerMove(e.clientX, e.clientY));
+  window.addEventListener('mouseup', cropPointerUp);
+  cropViewport.addEventListener('touchstart', e=>{
+    const t = e.touches[0]; cropPointerDown(t.clientX, t.clientY);
+  }, { passive: true });
+  cropViewport.addEventListener('touchmove', e=>{
+    const t = e.touches[0]; cropPointerMove(t.clientX, t.clientY);
+  }, { passive: true });
+  cropViewport.addEventListener('touchend', cropPointerUp);
+
+  document.getElementById('cropUseBtn').addEventListener('click', async ()=>{
+    if(!currentUser) return;
+    const totalScale = cropBaseScale * cropZoom;
+    const sx = (0 - cropOffsetX) / totalScale;
+    const sy = (0 - cropOffsetY) / totalScale;
+    const sSize = CROP_VIEWPORT_SIZE / totalScale;
+    const canvas = document.createElement('canvas');
+    canvas.width = CROP_OUTPUT_SIZE; canvas.height = CROP_OUTPUT_SIZE;
+    canvas.getContext('2d').drawImage(cropImageEl, sx, sy, sSize, sSize, 0, 0, CROP_OUTPUT_SIZE, CROP_OUTPUT_SIZE);
+    const dataUri = canvas.toDataURL('image/jpeg', 0.82);
+    try{
+      await db.collection('users').doc(currentUser.uid).set({ photoDataUri: dataUri }, { merge: true });
+      profilePhotoDataUri = dataUri;
+      updateProfileHeaderUI(currentUser);
+      refreshAccountAvatarUI();
+      closeCropSheet();
+    }catch(e){
+      showConfirm(e.message || 'That photo could not be saved. Try again.', { confirmLabel:'OK', cancelLabel:null });
+    }
+  });
+
   auth.onAuthStateChanged(async (user)=>{
     currentUser = user;
     if(user){
@@ -1980,6 +2272,7 @@
     } else {
       detachCloudListeners();
       books = []; wishlist = []; loans = [];
+      profilePhotoDataUri = null;
       document.getElementById('authEmail').value = '';
       document.getElementById('authPassword').value = '';
       setAuthError(null);
