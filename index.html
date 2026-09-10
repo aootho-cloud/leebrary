@@ -2059,19 +2059,42 @@
   // One-time offer, right after a fresh login, to upload whatever's already saved
   // locally on this device/browser into the (currently empty) cloud account — so
   // switching to an account doesn't strand data that predates it.
+  // One-time-per-device offer, right after a fresh login, to upload whatever's
+  // already saved locally on THIS device/browser into the cloud account — so
+  // switching to an account doesn't strand data that predates it. Checked
+  // independently per data type (books / wishlist / loans): a device shouldn't be
+  // skipped just because the account already has books synced from elsewhere —
+  // it might still have its own local-only list or lent entries nobody's offered
+  // to upload yet.
   async function maybeOfferLocalMigration(uid){
     const libRef = db.collection('users').doc(uid).collection('library');
-    const booksDoc = await libRef.doc('books').get();
+    const [booksDoc, wishDoc, loansDoc] = await Promise.all([
+      libRef.doc('books').get(),
+      libRef.doc('wishlist').get(),
+      libRef.doc('loans').get()
+    ]);
     const cloudHasBooks = booksDoc.exists && Array.isArray(booksDoc.data().books) && booksDoc.data().books.length > 0;
+    const cloudHasWishlist = wishDoc.exists && Array.isArray(wishDoc.data().wishlist) && wishDoc.data().wishlist.length > 0;
+    const cloudHasLoans = loansDoc.exists && Array.isArray(loansDoc.data().loans) && loansDoc.data().loans.length > 0;
+
     await loadBooks(); await loadWishlist(); await loadLoans(); // read whatever's local, without touching the live `books`/etc used on screen
     const localBooks = books, localWishlist = wishlist, localLoans = loans;
-    if(!cloudHasBooks && localBooks.length > 0){
+
+    const needsBooks = !cloudHasBooks && localBooks.length > 0;
+    const needsWishlist = !cloudHasWishlist && localWishlist.length > 0;
+    const needsLoans = !cloudHasLoans && localLoans.length > 0;
+
+    if(needsBooks || needsWishlist || needsLoans){
+      const parts = [];
+      if(needsBooks) parts.push(`${localBooks.length} book${localBooks.length===1?'':'s'}`);
+      if(needsWishlist) parts.push(`${localWishlist.length} list item${localWishlist.length===1?'':'s'}`);
+      if(needsLoans) parts.push(`${localLoans.length} loan record${localLoans.length===1?'':'s'}`);
       showConfirm(
-        `Found ${localBooks.length} book${localBooks.length===1?'':'s'} already saved on this device. Upload them to your account?`,
+        `Found ${parts.join(', ')} already saved on this device. Upload them to your account?`,
         { confirmLabel:'Upload', onConfirm: async ()=>{
-          await libRef.doc('books').set({ books: localBooks });
-          await libRef.doc('wishlist').set({ wishlist: localWishlist });
-          await libRef.doc('loans').set({ loans: localLoans });
+          if(needsBooks) await libRef.doc('books').set({ books: localBooks });
+          if(needsWishlist) await libRef.doc('wishlist').set({ wishlist: localWishlist });
+          if(needsLoans) await libRef.doc('loans').set({ loans: localLoans });
         }}
       );
     }
