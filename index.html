@@ -1445,6 +1445,25 @@
     <button class="btn settings-action-btn" id="authToggleModeBtn">Need an account? Sign up</button>
   </div>
 </div>
+<div id="forgotPasswordScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-wordmark"><span class="script">Lee</span>brary</div>
+    <div class="auth-subtitle">Reset your password</div>
+    <div id="forgotRequestView">
+      <div class="field">
+        <label for="forgotEmail">Email</label>
+        <input type="email" id="forgotEmail" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="auth-error" id="forgotError" style="display:none;"></div>
+      <button class="btn primary settings-action-btn" id="forgotSendBtn">Send reset email</button>
+      <button class="btn settings-action-btn" id="forgotBackToLoginBtn">Log in</button>
+    </div>
+    <div id="forgotConfirmView" style="display:none;">
+      <p class="settings-desc" id="forgotConfirmMessage" style="text-align:center;"></p>
+      <button class="btn primary settings-action-btn" id="forgotConfirmLoginBtn">Log in</button>
+    </div>
+  </div>
+</div>
 <div id="resetPasswordScreen" class="auth-screen">
   <div class="auth-card">
     <div class="auth-wordmark"><span class="script">Lee</span>brary</div>
@@ -2170,16 +2189,71 @@
   wirePasswordToggle('resetNewPassword', 'resetPasswordToggle');
 
   // ---------- Forgot password ----------
-  document.getElementById('forgotPasswordBtn').addEventListener('click', async ()=>{
-    const email = document.getElementById('authEmail').value.trim();
-    if(!email){ setAuthError('Enter your email above first, then tap "Forgot password?" again.'); return; }
-    setAuthError(null);
+  // ---------- Forgot password screen ----------
+  // A dedicated screen (not just a link that fires off an email from whatever's
+  // typed on the login form) with two states: request (email + send button) and
+  // confirm (a message + a way back to login). The confirmation message is
+  // intentionally the SAME wording whether or not the email is actually registered
+  // — never reveal that via the UI, since doing so would let anyone probe which
+  // emails have accounts here. A genuine send failure (bad format, rate-limited,
+  // offline, etc.) still surfaces as a real error instead of the generic message.
+  const forgotPasswordScreen = document.getElementById('forgotPasswordScreen');
+  const forgotRequestView = document.getElementById('forgotRequestView');
+  const forgotConfirmView = document.getElementById('forgotConfirmView');
+  function setForgotError(msg){
+    const el = document.getElementById('forgotError');
+    if(!msg){ el.style.display = 'none'; el.textContent = ''; return; }
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+  function openForgotPasswordScreen(){
+    document.getElementById('forgotEmail').value = document.getElementById('authEmail').value.trim();
+    setForgotError(null);
+    forgotRequestView.style.display = 'block';
+    forgotConfirmView.style.display = 'none';
+    hideAuthScreen();
+    forgotPasswordScreen.classList.add('open');
+  }
+  function closeForgotPasswordScreen(){
+    forgotPasswordScreen.classList.remove('open');
+    showAuthScreen();
+  }
+  document.getElementById('forgotPasswordBtn').addEventListener('click', openForgotPasswordScreen);
+  document.getElementById('forgotBackToLoginBtn').addEventListener('click', closeForgotPasswordScreen);
+  document.getElementById('forgotConfirmLoginBtn').addEventListener('click', closeForgotPasswordScreen);
+
+  document.getElementById('forgotSendBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('forgotEmail').value.trim();
+    if(!email){ setForgotError('Enter your email address.'); return; }
+    setForgotError(null);
+    const btn = document.getElementById('forgotSendBtn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="btn-spinner"></span>Sending…`;
+    const showGenericConfirmation = ()=>{
+      document.getElementById('forgotConfirmMessage').textContent =
+        `If ${email} is registered with us, an email will be sent to that address with a link to reset your password.`;
+      forgotRequestView.style.display = 'none';
+      forgotConfirmView.style.display = 'block';
+    };
     try{
       await auth.sendPasswordResetEmail(email);
-      showConfirm(`Password reset email sent to ${email} — check your inbox for the link.`, { confirmLabel:'OK', cancelLabel:null });
+      showGenericConfirmation();
     }catch(e){
-      setAuthError(e.message || 'Could not send reset email.');
+      if(e.code === 'auth/user-not-found'){
+        // Don't reveal that this email has no account — same confirmation either way.
+        showGenericConfirmation();
+      } else if(e.code === 'auth/invalid-email'){
+        setForgotError('That doesn\'t look like a valid email address.');
+      } else if(e.code === 'auth/too-many-requests'){
+        setForgotError('Too many attempts — please wait a bit and try again.');
+      } else if(e.code === 'auth/network-request-failed'){
+        setForgotError('Network error — check your connection and try again.');
+      } else {
+        setForgotError(e.message || 'Could not send reset email. Try again.');
+      }
     }
+    btn.disabled = false;
+    btn.textContent = 'Send reset email';
   });
 
   // ---------- "Set new password" screen (opened via the link in the reset email) ----------
