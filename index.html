@@ -4213,7 +4213,18 @@
   });
 
   document.getElementById('exportDataBtn').addEventListener('click', ()=>{
-    const payload = { app:'leebrary', version:1, exportedAt: todayStr(), books };
+    const payload = {
+      app: 'leebrary',
+      version: 2,
+      exportedAt: todayStr(),
+      books,
+      wishlist,
+      loans,
+      profile: currentUser ? {
+        displayName: currentUser.displayName || '',
+        photoDataUri: profilePhotoDataUri || null
+      } : null
+    };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -4237,30 +4248,68 @@
     const reader = new FileReader();
     reader.onload = ()=>{
       importFileInput.value = '';
-      let incoming;
+      let parsed;
       try{
-        const parsed = JSON.parse(reader.result);
-        incoming = Array.isArray(parsed) ? parsed : parsed.books;
-        if(!Array.isArray(incoming)) throw new Error('not an array');
+        parsed = JSON.parse(reader.result);
       }catch(e){
         showConfirm('That file could not be read as a Leebrary backup.', { confirmLabel:'OK', cancelLabel:null });
         return;
       }
-      const existingIds = new Set(books.map(b=>b.id));
-      const newOnes = incoming.filter(b=> b && b.id && b.title && !existingIds.has(b.id));
-      const skipped = incoming.length - newOnes.length;
-      const summary = `Found ${incoming.length} book${incoming.length===1?'':'s'} in that file — ${newOnes.length} new, ${skipped} already in your library. Import the ${newOnes.length} new one${newOnes.length===1?'':'s'}?`;
-      if(newOnes.length === 0){
-        showConfirm(`All ${incoming.length} book${incoming.length===1?'':'s'} in that file are already in your library — nothing new to import.`, { confirmLabel:'OK', cancelLabel:null });
+      // Older exports (v1) were just books, sometimes as a raw array; newer ones
+      // (v2) are an object also carrying wishlist, loans, and profile info.
+      const incomingBooks = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.books) ? parsed.books : null);
+      if(!incomingBooks){
+        showConfirm('That file could not be read as a Leebrary backup.', { confirmLabel:'OK', cancelLabel:null });
         return;
       }
+      const incomingWishlist = (!Array.isArray(parsed) && Array.isArray(parsed.wishlist)) ? parsed.wishlist : [];
+      const incomingLoans = (!Array.isArray(parsed) && Array.isArray(parsed.loans)) ? parsed.loans : [];
+      const incomingProfile = (!Array.isArray(parsed) && parsed.profile && typeof parsed.profile === 'object') ? parsed.profile : null;
+
+      const existingBookIds = new Set(books.map(b=>b.id));
+      const newBooks = incomingBooks.filter(b=> b && b.id && b.title && !existingBookIds.has(b.id));
+      const existingWishIds = new Set(wishlist.map(w=>w.id));
+      const newWish = incomingWishlist.filter(w=> w && w.id && w.title && !existingWishIds.has(w.id));
+      const existingLoanIds = new Set(loans.map(l=>l.id));
+      const newLoans = incomingLoans.filter(l=> l && l.id && l.bookTitle && !existingLoanIds.has(l.id));
+
+      if(newBooks.length===0 && newWish.length===0 && newLoans.length===0 && !incomingProfile){
+        showConfirm('Everything in that file is already in your library — nothing new to import.', { confirmLabel:'OK', cancelLabel:null });
+        return;
+      }
+
+      const parts = [];
+      if(incomingBooks.length) parts.push(`${newBooks.length} new book${newBooks.length===1?'':'s'} (of ${incomingBooks.length})`);
+      if(incomingWishlist.length) parts.push(`${newWish.length} new list item${newWish.length===1?'':'s'} (of ${incomingWishlist.length})`);
+      if(incomingLoans.length) parts.push(`${newLoans.length} new loan record${newLoans.length===1?'':'s'} (of ${incomingLoans.length})`);
+      if(incomingProfile) parts.push('your profile info (name/photo)');
+      const summary = `Found: ${parts.join(', ')}. Import?`;
+
       showConfirm(summary, {
         confirmLabel: 'Import',
         onConfirm: async ()=>{
-          newOnes.forEach(b=> books.push(b));
+          newBooks.forEach(b=> books.push(b));
+          newWish.forEach(w=> wishlist.push(w));
+          newLoans.forEach(l=> loans.push(l));
           saveBooks();
+          saveWishlist();
+          saveLoans();
+          if(incomingProfile && currentUser){
+            try{
+              if(typeof incomingProfile.displayName === 'string' && incomingProfile.displayName){
+                await currentUser.updateProfile({ displayName: incomingProfile.displayName });
+              }
+              if(incomingProfile.photoDataUri){
+                await db.collection('users').doc(currentUser.uid).set({ photoDataUri: incomingProfile.photoDataUri }, { merge: true });
+                profilePhotoDataUri = incomingProfile.photoDataUri;
+              }
+              updateProfileHeaderUI(currentUser);
+            }catch(e){
+              // Profile import is best-effort — books/list/loans above already succeeded regardless.
+            }
+          }
           renderMain();
-          showConfirm(`Imported ${newOnes.length} book${newOnes.length===1?'':'s'} successfully.`, { confirmLabel:'OK', cancelLabel:null });
+          showToast('Import complete');
         }
       });
     };
