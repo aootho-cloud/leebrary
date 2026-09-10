@@ -99,10 +99,40 @@
   .auth-card{
     width:100%;
     max-width:340px;
-    padding:28px 24px;
+    padding:32px 26px;
     box-sizing:border-box;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:18px;
+    box-shadow:var(--shadow);
   }
   .auth-card .field{ margin-bottom:14px; }
+  .auth-monogram{
+    width:56px;
+    height:56px;
+    border-radius:16px;
+    margin:0 auto 14px;
+    background:linear-gradient(135deg, var(--spine), var(--spine-deep));
+    color:var(--paper);
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .auth-subtitle{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:12.5px;
+    margin-bottom:20px;
+  }
+  .auth-google-btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+  }
   .auth-error{
     background:var(--tag-red-bg);
     color:var(--tag-red);
@@ -123,6 +153,75 @@
     color:var(--ink-soft);
     font-size:12px;
     margin:16px 0;
+  }
+  .header-icons{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .profile-menu-wrap{ position:relative; }
+  .profile-avatar-img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    border-radius:11px;
+  }
+  .profile-dropdown{
+    display:none;
+    position:absolute;
+    top:46px;
+    right:0;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:12px;
+    box-shadow:var(--shadow);
+    min-width:150px;
+    padding:6px;
+    z-index:50;
+    flex-direction:column;
+  }
+  .profile-dropdown.open{ display:flex; }
+  .profile-dropdown button{
+    background:transparent;
+    border:none;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:8px;
+    font-size:13.5px;
+    font-family:inherit;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .profile-dropdown button:hover{ background:var(--paper-deep); }
+  .account-avatar-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:20px;
+  }
+  .account-avatar-wrap{
+    width:64px;
+    height:64px;
+    border-radius:50%;
+    background:var(--paper-deep);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    font-size:22px;
+    flex-shrink:0;
+  }
+  .account-avatar-wrap img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+  .account-email-readonly{
+    padding:10px 12px;
+    border-radius:10px;
+    background:var(--paper-deep);
+    color:var(--ink-soft);
+    font-size:13.5px;
   }
   .header-icon-btn{
     border:1px solid var(--line);
@@ -1207,8 +1306,10 @@
 <body>
 <div id="authScreen" class="auth-screen">
   <div class="auth-card">
+    <div class="auth-monogram">L</div>
     <div class="brand" style="justify-content:center;"><span class="script">Lee</span>brary</div>
-    <div class="tagline" style="text-align:center; margin-bottom:22px;">a library that remembers</div>
+    <div class="tagline" style="text-align:center; margin-bottom:6px;">a library that remembers</div>
+    <div class="auth-subtitle" id="authSubtitle">Log in to sync your library across devices</div>
     <div class="field">
       <label for="authEmail">Email</label>
       <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
@@ -1221,7 +1322,10 @@
     <button class="btn primary settings-action-btn" id="authSubmitBtn">Log in</button>
     <button class="btn settings-action-btn" id="authToggleModeBtn">Need an account? Sign up</button>
     <div class="auth-divider">or</div>
-    <button class="btn settings-action-btn" id="googleSignInBtn">Sign in with Google</button>
+    <button class="btn settings-action-btn auth-google-btn" id="googleSignInBtn">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4c-7.5 0-14 4.2-17.3 10.3z"/><path fill="#4CAF50" d="M24 44c5.4 0 10.3-2.1 14-5.4l-6.5-5.5C29.4 34.7 26.8 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.5 5C9.9 39.7 16.4 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.5C41.5 36.5 44 30.9 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>
+      <span>Sign in with Google</span>
+    </button>
   </div>
 </div>
 <div id="app">
@@ -1231,13 +1335,28 @@
       <div class="brand"><span class="script">Lee</span>brary</div>
       <div class="tagline">a library that remembers</div>
     </div>
-    <button class="header-icon-btn" id="settingsBtn" title="Backup & restore">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-      </svg>
-      <span class="header-dot" id="settingsWarningDot"></span>
-    </button>
+    <div class="header-icons">
+      <div class="profile-menu-wrap">
+        <button class="header-icon-btn" id="profileBtn" title="Account">
+          <img id="profileAvatarImg" class="profile-avatar-img" style="display:none;" alt="">
+          <svg id="profileDefaultIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </button>
+        <div class="profile-dropdown" id="profileDropdown">
+          <button id="myAccountBtn">My Account</button>
+          <button id="dropdownLogOutBtn">Log out</button>
+        </div>
+      </div>
+      <button class="header-icon-btn" id="settingsBtn" title="Backup & restore">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span class="header-dot" id="settingsWarningDot"></span>
+      </button>
+    </div>
   </header>
 
   <main id="main"></main>
@@ -1392,8 +1511,6 @@
   <div class="sheet-backdrop" id="settingsBackdrop">
     <div class="sheet">
       <h2>Backup & restore</h2>
-      <div class="settings-desc" id="settingsAccountLine" style="margin-bottom:14px;"></div>
-      <button class="btn settings-action-btn" id="logOutBtn" style="margin-bottom:18px;">Log out</button>
       <p class="settings-desc">Your library syncs to your account automatically. A backup file is still useful as an extra copy, or to move data between accounts.</p>
       <div class="settings-last-backup" id="settingsLastBackup"></div>
       <div class="settings-backup-warning" id="settingsBackupWarning" style="display:none;">
@@ -1405,6 +1522,33 @@
       <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
       <div class="sheet-actions">
         <button class="btn" id="closeSettingsBtn" style="flex:1;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="accountBackdrop">
+    <div class="sheet">
+      <h2>My Account</h2>
+      <div class="account-avatar-row">
+        <div class="account-avatar-wrap" id="accountAvatarWrap">
+          <img id="accountAvatarImg" style="display:none;" alt="">
+          <span id="accountAvatarPlaceholder">📷</span>
+        </div>
+        <label class="upload-btn" for="accountAvatarInput">Change photo</label>
+        <input type="file" id="accountAvatarInput" accept="image/*" style="display:none;">
+      </div>
+      <div class="field">
+        <label for="accountNameInput">Name</label>
+        <input type="text" id="accountNameInput" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <div class="account-email-readonly" id="accountEmailReadonly"></div>
+      </div>
+      <button class="btn primary settings-action-btn" id="saveAccountBtn">Save changes</button>
+      <button class="btn settings-action-btn" id="changePasswordBtn">Change password</button>
+      <div class="sheet-actions">
+        <button class="btn" id="closeAccountBtn" style="flex:1;">Close</button>
       </div>
     </div>
   </div>
@@ -1708,6 +1852,7 @@
   function updateAuthModeUI(){
     document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? 'Log in' : 'Sign up';
     document.getElementById('authToggleModeBtn').textContent = authMode === 'login' ? 'Need an account? Sign up' : 'Already have an account? Log in';
+    document.getElementById('authSubtitle').textContent = authMode === 'login' ? 'Log in to sync your library across devices' : 'Create an account to start syncing your library';
   }
   document.getElementById('authToggleModeBtn').addEventListener('click', ()=>{
     authMode = authMode === 'login' ? 'signup' : 'login';
@@ -1743,10 +1888,101 @@
   });
   updateAuthModeUI();
 
-  document.getElementById('logOutBtn').addEventListener('click', ()=>{
+  const profileDropdown = document.getElementById('profileDropdown');
+  document.getElementById('profileBtn').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    profileDropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', ()=>{ profileDropdown.classList.remove('open'); });
+  profileDropdown.addEventListener('click', e=> e.stopPropagation());
+  document.getElementById('dropdownLogOutBtn').addEventListener('click', ()=>{
+    profileDropdown.classList.remove('open');
     showConfirm('Log out of your account?', {
       confirmLabel: 'Log out',
       onConfirm: ()=>{ auth.signOut(); }
+    });
+  });
+
+  function updateProfileHeaderUI(user){
+    const img = document.getElementById('profileAvatarImg');
+    const placeholder = document.getElementById('profileDefaultIcon');
+    if(user && user.photoURL){
+      img.src = user.photoURL;
+      img.style.display = 'block';
+      placeholder.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      placeholder.style.display = 'block';
+    }
+  }
+
+  // ---------- My Account sheet ----------
+  const accountBackdrop = document.getElementById('accountBackdrop');
+  function openAccountSheet(){
+    if(!currentUser) return;
+    document.getElementById('accountNameInput').value = currentUser.displayName || '';
+    document.getElementById('accountEmailReadonly').textContent = currentUser.email || '';
+    const img = document.getElementById('accountAvatarImg');
+    const placeholder = document.getElementById('accountAvatarPlaceholder');
+    if(currentUser.photoURL){
+      img.src = currentUser.photoURL; img.style.display = 'block'; placeholder.style.display = 'none';
+    } else {
+      img.style.display = 'none'; placeholder.style.display = 'block';
+    }
+    // Google-only accounts have no password to change — hide that action for them.
+    const isPasswordUser = currentUser.providerData.some(p=>p.providerId==='password');
+    document.getElementById('changePasswordBtn').style.display = isPasswordUser ? 'block' : 'none';
+    accountBackdrop.classList.add('open');
+  }
+  document.getElementById('myAccountBtn').addEventListener('click', ()=>{
+    profileDropdown.classList.remove('open');
+    openAccountSheet();
+  });
+  document.getElementById('closeAccountBtn').addEventListener('click', ()=> accountBackdrop.classList.remove('open'));
+  accountBackdrop.addEventListener('click', e=>{ if(e.target===accountBackdrop) accountBackdrop.classList.remove('open'); });
+
+  document.getElementById('accountAvatarInput').addEventListener('change', async ()=>{
+    const input = document.getElementById('accountAvatarInput');
+    const file = input.files && input.files[0];
+    if(!file || !currentUser) return;
+    try{
+      const dataUri = await resizeImageFile(file, 160, 0.75);
+      await currentUser.updateProfile({ photoURL: dataUri });
+      const img = document.getElementById('accountAvatarImg');
+      const placeholder = document.getElementById('accountAvatarPlaceholder');
+      img.src = dataUri; img.style.display = 'block'; placeholder.style.display = 'none';
+      updateProfileHeaderUI(currentUser);
+    }catch(e){
+      showConfirm('That photo could not be used. Try a different one.', { confirmLabel:'OK', cancelLabel:null });
+    }
+    input.value = '';
+  });
+
+  document.getElementById('saveAccountBtn').addEventListener('click', async ()=>{
+    if(!currentUser) return;
+    const name = document.getElementById('accountNameInput').value.trim();
+    try{
+      await currentUser.updateProfile({ displayName: name });
+      updateProfileHeaderUI(currentUser);
+      accountBackdrop.classList.remove('open');
+      showConfirm('Account updated.', { confirmLabel:'OK', cancelLabel:null });
+    }catch(e){
+      showConfirm(e.message || 'Could not save changes.', { confirmLabel:'OK', cancelLabel:null });
+    }
+  });
+
+  document.getElementById('changePasswordBtn').addEventListener('click', ()=>{
+    if(!currentUser || !currentUser.email) return;
+    showConfirm(`Send a password reset link to ${currentUser.email}?`, {
+      confirmLabel: 'Send',
+      onConfirm: async ()=>{
+        try{
+          await auth.sendPasswordResetEmail(currentUser.email);
+          showConfirm('Password reset email sent — check your inbox.', { confirmLabel:'OK', cancelLabel:null });
+        }catch(e){
+          showConfirm(e.message || 'Could not send reset email.', { confirmLabel:'OK', cancelLabel:null });
+        }
+      }
     });
   });
 
@@ -1754,8 +1990,7 @@
     currentUser = user;
     if(user){
       hideAuthScreen();
-      const acctLine = document.getElementById('settingsAccountLine');
-      if(acctLine) acctLine.textContent = `Logged in as ${user.email}`;
+      updateProfileHeaderUI(user);
       attachCloudListeners(user.uid);
       await maybeOfferLocalMigration(user.uid);
     } else {
@@ -1764,10 +1999,12 @@
       document.getElementById('authEmail').value = '';
       document.getElementById('authPassword').value = '';
       setAuthError(null);
+      updateProfileHeaderUI(null);
       showAuthScreen();
       renderMain();
     }
   });
+
 
 
   // ---------- Rendering: Library ----------
