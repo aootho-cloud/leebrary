@@ -98,6 +98,7 @@
     justify-content:center;
     cursor:pointer;
     flex-shrink:0;
+    position:relative;
     align-self:center;
   }
 
@@ -620,6 +621,41 @@
     border:1.5px solid var(--card);
   }
   .tab-dot.show{ display:block; }
+  .header-icon-btn .header-dot{
+    display:none;
+    position:absolute;
+    top:-2px;
+    right:-2px;
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:var(--tag-red);
+    border:1.5px solid var(--paper);
+  }
+  .header-icon-btn .header-dot.show{ display:block; }
+  .settings-last-backup{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin:-6px 0 14px;
+  }
+  .settings-backup-warning{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+    background:var(--tag-red-bg);
+    color:var(--tag-red);
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:12.5px;
+    line-height:1.4;
+    margin:-6px 0 14px;
+  }
+  .count-row{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin:0 0 10px;
+    padding:0 2px;
+  }
 
   /* Sheet / modal */
   .sheet-backdrop{
@@ -1124,6 +1160,7 @@
         <circle cx="12" cy="12" r="3"></circle>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
       </svg>
+      <span class="header-dot" id="settingsWarningDot"></span>
     </button>
   </header>
 
@@ -1163,14 +1200,24 @@
       <div class="field">
         <label>Status</label>
         <div class="status-choice" id="statusChoice">
-          <button data-status="to-read" class="active">To read</button>
+          <button data-status="to-read" class="active">TBR</button>
           <button data-status="reading">Reading</button>
-          <button data-status="done">Read</button>
+          <button data-status="done">Done</button>
         </div>
       </div>
       <div class="field" id="finishedDateField" style="display:none;">
-        <label for="fFinished">Date finished</label>
-        <input type="date" id="fFinished">
+        <div class="toggle-row" id="approxDateToggleRow" style="margin-bottom:10px;">
+          <span>Not sure of the exact date</span>
+          <div class="switch" id="approxDateSwitch"><div class="knob"></div></div>
+        </div>
+        <div id="exactFinishedFields">
+          <label for="fFinished">Date finished</label>
+          <input type="date" id="fFinished">
+        </div>
+        <div class="field" id="approxYearField" style="display:none; margin-top:0; margin-bottom:0;">
+          <label for="fFinishedYear">Year finished</label>
+          <select id="fFinishedYear"></select>
+        </div>
       </div>
       <div class="field">
         <div class="toggle-row">
@@ -1205,7 +1252,7 @@
       <div class="filter-section">
         <div class="filter-section-label">Reading status</div>
         <div class="chip-multi" id="statusChipGroup">
-          <button data-val="to-read">To read</button>
+          <button data-val="to-read">TBR</button>
           <button data-val="reading">Reading</button>
           <button data-val="done">Done</button>
         </div>
@@ -1262,6 +1309,11 @@
     <div class="sheet">
       <h2>Backup & restore</h2>
       <p class="settings-desc">Your library is saved only in this browser. To use it somewhere else — another browser, or your phone as well as a computer — export a backup file here, then import it there. Importing adds any books not already in your library; it won't duplicate ones that are.</p>
+      <div class="settings-last-backup" id="settingsLastBackup"></div>
+      <div class="settings-backup-warning" id="settingsBackupWarning" style="display:none;">
+        <span>⚠️</span>
+        <span id="settingsBackupWarningText"></span>
+      </div>
       <button class="btn primary settings-action-btn" id="exportDataBtn">Export backup file</button>
       <button class="btn settings-action-btn" id="importDataBtn">Import backup file</button>
       <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
@@ -1356,7 +1408,7 @@
   let lentStatusFilter = 'all'; // 'all' | 'active' | 'returned'
   const OVERDUE_DAYS = 30;
 
-  const STATUS_LABELS = {'to-read':'To read','reading':'Reading','done':'Read'};
+  const STATUS_LABELS = {'to-read':'TBR','reading':'Reading','done':'Done'};
   function starString(rating){
     const r = Math.max(0, Math.min(5, rating||0));
     let out = '';
@@ -1371,7 +1423,10 @@
   function fmtDate(iso){
     if(!iso) return '';
     const d = new Date(iso + 'T00:00:00');
-    return d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
   }
   function daysSince(dateStr){
     if(!dateStr) return 0;
@@ -1385,6 +1440,45 @@
 
   const STORAGE_KEY = 'leebrary_books_v1';
   const WISHLIST_STORAGE_KEY = 'leebrary_wishlist_v1';
+  const LAST_BACKUP_KEY = 'leebrary_last_backup_v1';
+  const BACKUP_WARNING_DAYS = 7;
+
+  function getLastBackupAt(){
+    try{ return localStorage.getItem(LAST_BACKUP_KEY); }catch(e){ return null; }
+  }
+  function setLastBackupAt(iso){
+    try{ localStorage.setItem(LAST_BACKUP_KEY, iso); }catch(e){}
+  }
+  function daysSinceIso(iso){
+    if(!iso) return Infinity;
+    return Math.floor((new Date() - new Date(iso)) / 86400000);
+  }
+  function isBackupStale(){
+    return daysSinceIso(getLastBackupAt()) >= BACKUP_WARNING_DAYS;
+  }
+  function updateSettingsDot(){
+    const dot = document.getElementById('settingsWarningDot');
+    if(dot) dot.classList.toggle('show', isBackupStale());
+  }
+  function refreshBackupInfo(){
+    const lastAt = getLastBackupAt();
+    const infoEl = document.getElementById('settingsLastBackup');
+    const warnEl = document.getElementById('settingsBackupWarning');
+    const warnTextEl = document.getElementById('settingsBackupWarningText');
+    if(infoEl){
+      infoEl.textContent = lastAt
+        ? `Last backup: ${fmtDate(lastAt.slice(0,10))}`
+        : 'Last backup: never';
+    }
+    const stale = isBackupStale();
+    if(warnEl) warnEl.style.display = stale ? 'flex' : 'none';
+    if(warnTextEl){
+      warnTextEl.textContent = lastAt
+        ? `It's been over ${BACKUP_WARNING_DAYS} days since your last backup. Export one now to keep your library safe.`
+        : `You haven't backed up your library yet. Export a backup file to keep it safe.`;
+    }
+    updateSettingsDot();
+  }
 
   async function loadBooks(){
     try{
@@ -1533,7 +1627,7 @@
     html += `<div class="quick-filter-row">
       <div class="segmented" id="quickFilter">
         <button data-val="all" class="${quickStatusValue()==='all'?'active':''}">All</button>
-        <button data-val="to-read" class="${quickStatusValue()==='to-read'?'active':''}">To read</button>
+        <button data-val="to-read" class="${quickStatusValue()==='to-read'?'active':''}">TBR</button>
         <button data-val="done" class="${quickStatusValue()==='done'?'active':''}">Done</button>
       </div>
       <button class="filter-icon-btn" id="filterIconBtn" title="More filters">
@@ -1552,7 +1646,7 @@
         ${sortDir==='desc' ? '↓ Recent first' : '↑ Oldest first'}
       </button>
     </div>`;
-    html += `<button class="btn surprise-btn" id="surpriseBtn">🎲 Surprise me from your to-read pile</button>`;
+    html += `<button class="btn surprise-btn" id="surpriseBtn">🎲 Choose a book to read</button>`;
     html += `<div class="search-row"><input type="text" id="searchInput" placeholder="Search title or author" value="${escapeAttr(searchTerm)}"></div>`;
 
     if(filtered.length === 0){
@@ -1697,9 +1791,13 @@
     const stars = b.rating ? `<div class="stars-row">${starString(b.rating)}</div>` : '';
     const review = b.review ? `<div class="detail-review"><div class="section-label">Notes</div><p>${escapeHtml(b.review)}</p></div>` : '';
 
+    const historyDateDisplay = (d)=> (b.dateFinishedApprox && d === b.dateFinished)
+      ? `sometime in ${b.dateFinishedApproxYear}`
+      : fmtDate(d);
+
     // If currently to-read/reading but it has been finished before, surface that plainly.
     const rereadNote = (b.status !== 'done' && history.length > 0)
-      ? `<div class="history-note">Read ${history.length} time${history.length===1?'':'s'} before · last finished ${fmtDate(history[history.length-1])}</div>`
+      ? `<div class="history-note">Read ${history.length} time${history.length===1?'':'s'} before · last finished ${historyDateDisplay(history[history.length-1])}</div>`
       : '';
 
     // A full dated log only earns its place once there's more than one read to compare.
@@ -1707,7 +1805,7 @@
       <div class="detail-review">
         <div class="section-label">Read history</div>
         <ul class="history-list">
-          ${history.map((d,i)=>`<li>${ordinal(i+1)} time — ${fmtDate(d)}</li>`).join('')}
+          ${history.map((d,i)=>`<li>${ordinal(i+1)} time — ${historyDateDisplay(d)}</li>`).join('')}
         </ul>
       </div>` : '';
 
@@ -1734,10 +1832,13 @@
     }
     statusActions += `<button class="btn tag-owner-btn${b.borrowed?' active':''}" data-action="toggle-borrowed" data-id="${b.id}">${b.borrowed?'Mark owned':'Mark borrowed'}</button>`;
 
+    const finishedDisplay = (d)=> (b.dateFinishedApprox && d === b.dateFinished)
+      ? `sometime in ${b.dateFinishedApproxYear}`
+      : fmtDate(d);
     const backloggedFinish = b.dateFinished && b.dateAdded && b.dateFinished < b.dateAdded;
     const dates = backloggedFinish
-      ? `<div class="detail-dates">Finished ${fmtDate(b.dateFinished)}</div>`
-      : `<div class="detail-dates">Added ${fmtDate(b.dateAdded)}${b.dateFinished ? ` · Finished ${fmtDate(b.dateFinished)}` : ''}</div>`;
+      ? `<div class="detail-dates">Finished ${finishedDisplay(b.dateFinished)}</div>`
+      : `<div class="detail-dates">Added ${fmtDate(b.dateAdded)}${b.dateFinished ? ` · Finished ${finishedDisplay(b.dateFinished)}` : ''}</div>`;
 
     // Prev/Next cycle through whatever set of books the library list currently shows (filters + search applied).
     const list = filteredBooks();
@@ -1816,6 +1917,8 @@
           const d = todayStr();
           book.status = 'done';
           book.dateFinished = d;
+          book.dateFinishedApprox = false;
+          book.dateFinishedApproxYear = null;
           if(!book.readHistory) book.readHistory = [];
           book.readHistory.push(d);
         }
@@ -1843,6 +1946,9 @@
 
     let html = '';
     html += `<div class="search-row"><input type="text" id="wishSearchInput" placeholder="Search title, author, or publisher" value="${escapeAttr(wishSearchTerm)}"></div>`;
+    if(all.length > 0){
+      html += `<div class="count-row">${all.length} book${all.length===1?'':'s'} on your list${list.length!==all.length ? ` · ${list.length} shown` : ''}</div>`;
+    }
 
     if(list.length === 0){
       html += all.length === 0
@@ -1904,6 +2010,9 @@
             }
           });
         }
+        if(action === 'edit'){
+          openWishSheet(item);
+        }
       });
     });
   }
@@ -1915,6 +2024,7 @@
       ${w.publisher ? `<div class="wish-publisher">${escapeHtml(w.publisher)}</div>` : ''}
       <div class="action-row">
         <button class="btn primary" data-action="buy" data-id="${w.id}">Mark as bought</button>
+        <button class="btn" data-action="edit" data-id="${w.id}">Edit</button>
         <button class="btn danger-outline" data-action="remove" data-id="${w.id}">Remove</button>
       </div>
     </div>`;
@@ -1940,6 +2050,7 @@
   function renderLent(){
     const main = document.getElementById('main');
     updateLentTabDot();
+    const activeCount = loans.filter(l=>!l.returned).length;
     const filtered = loans.filter(loanMatches);
     const overdue = filtered.filter(l=>isOverdue(l)).sort((a,b)=> (a.dateLent||'').localeCompare(b.dateLent||''));
     const activeNormal = filtered.filter(l=>!l.returned && !isOverdue(l)).sort((a,b)=> (b.dateLent||'').localeCompare(a.dateLent||''));
@@ -1950,6 +2061,9 @@
       ['all','All'],['active','Active'],['returned','Returned']
     ], lentStatusFilter);
     html += `<div class="search-row"><input type="text" id="lentSearchInput" placeholder="Search book or person" value="${escapeAttr(lentSearchTerm)}"></div>`;
+    if(loans.length > 0){
+      html += `<div class="count-row">${activeCount} book${activeCount===1?'':'s'} currently lent out</div>`;
+    }
 
     if(overdue.length === 0 && activeNormal.length === 0 && returned.length === 0){
       html += loans.length === 0
@@ -2267,6 +2381,19 @@
   let formBorrowed = false;
   let formCover = null;
   let formRating = 0;
+  let formApproxDate = false;
+  const approxDateSwitch = document.getElementById('approxDateSwitch');
+  const approxYearField = document.getElementById('approxYearField');
+  const fFinishedYear = document.getElementById('fFinishedYear');
+
+  (function populateFinishedYears(){
+    const currentYear = new Date().getFullYear();
+    let opts = '';
+    for(let y=currentYear; y>=currentYear-60; y--){
+      opts += `<option value="${y}">${y}</option>`;
+    }
+    fFinishedYear.innerHTML = opts;
+  })();
 
   function openSheet(book){
     editingId = book ? book.id : null;
@@ -2279,11 +2406,17 @@
     formBorrowed = book ? !!book.borrowed : false;
     formCover = book ? (book.cover || null) : null;
     formRating = book ? (book.rating || 0) : 0;
+    // The "not sure of the exact date" option is only offered when adding a new book —
+    // once a book exists, editing always works with a concrete date.
+    formApproxDate = false;
+    document.getElementById('approxDateToggleRow').style.display = book ? 'none' : 'flex';
+    fFinishedYear.value = (book && book.dateFinishedApproxYear) ? String(book.dateFinishedApproxYear) : String(new Date().getFullYear());
     coverInput.value = '';
     updateStatusChoiceUI();
     updateBorrowedUI();
     updateCoverUI();
     updateRatingUI();
+    updateApproxDateUI();
     sheetBackdrop.classList.add('open');
     setTimeout(()=>document.getElementById('fTitle').focus(), 50);
   }
@@ -2294,6 +2427,11 @@
       b.classList.toggle('active', b.getAttribute('data-status')===formStatus);
     });
     finishedDateField.style.display = formStatus==='done' ? 'block' : 'none';
+  }
+  function updateApproxDateUI(){
+    approxDateSwitch.classList.toggle('on', formApproxDate);
+    document.getElementById('exactFinishedFields').style.display = formApproxDate ? 'none' : 'block';
+    approxYearField.style.display = formApproxDate ? 'block' : 'none';
   }
   function updateBorrowedUI(){
     borrowedSwitch.classList.toggle('on', formBorrowed);
@@ -2366,6 +2504,10 @@
     formBorrowed = !formBorrowed;
     updateBorrowedUI();
   });
+  approxDateSwitch.addEventListener('click', ()=>{
+    formApproxDate = !formApproxDate;
+    updateApproxDateUI();
+  });
   ratingPicker.querySelectorAll('.star-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const v = parseInt(btn.getAttribute('data-val'),10);
@@ -2388,7 +2530,10 @@
     const author = document.getElementById('fAuthor').value.trim();
     if(!author){ document.getElementById('fAuthor').focus(); return; }
     const review = document.getElementById('fReview').value.trim();
-    const finished = document.getElementById('fFinished').value || todayStr();
+    const approxYear = parseInt(fFinishedYear.value, 10);
+    const finished = formApproxDate
+      ? `${approxYear}-07-02`
+      : (document.getElementById('fFinished').value || todayStr());
 
     if(editingId){
       const book = books.find(x=>x.id===editingId);
@@ -2411,8 +2556,12 @@
             book.readHistory.push(finished);
           }
           book.dateFinished = finished;
+          book.dateFinishedApprox = formApproxDate;
+          book.dateFinishedApproxYear = formApproxDate ? approxYear : null;
         } else {
           book.dateFinished = null;
+          book.dateFinishedApprox = false;
+          book.dateFinishedApproxYear = null;
         }
       }
       view = 'detail';
@@ -2428,6 +2577,8 @@
         review: review,
         dateAdded: todayStr(),
         dateFinished: formStatus==='done' ? finished : null,
+        dateFinishedApprox: formStatus==='done' ? formApproxDate : false,
+        dateFinishedApproxYear: formStatus==='done' && formApproxDate ? approxYear : null,
         readHistory: formStatus==='done' ? [finished] : []
       });
       view = currentTab;
@@ -2439,14 +2590,18 @@
 
   // ---------- Wishlist ("Add to your list") sheet ----------
   const wishSheetBackdrop = document.getElementById('wishSheetBackdrop');
-  function openWishSheet(){
-    document.getElementById('wTitle').value = '';
-    document.getElementById('wAuthor').value = '';
-    document.getElementById('wPublisher').value = '';
+  let editingWishId = null;
+  function openWishSheet(item){
+    editingWishId = item ? item.id : null;
+    wishSheetBackdrop.querySelector('h2').textContent = item ? 'Edit list entry' : 'Add to your list';
+    document.getElementById('wishSaveBtn').textContent = item ? 'Save changes' : 'Add to list';
+    document.getElementById('wTitle').value = item ? item.title : '';
+    document.getElementById('wAuthor').value = item ? (item.author||'') : '';
+    document.getElementById('wPublisher').value = item ? (item.publisher||'') : '';
     wishSheetBackdrop.classList.add('open');
     setTimeout(()=>document.getElementById('wTitle').focus(), 50);
   }
-  function closeWishSheet(){ wishSheetBackdrop.classList.remove('open'); }
+  function closeWishSheet(){ wishSheetBackdrop.classList.remove('open'); editingWishId = null; }
   document.getElementById('wishCancelBtn').addEventListener('click', closeWishSheet);
   wishSheetBackdrop.addEventListener('click', e=>{ if(e.target===wishSheetBackdrop) closeWishSheet(); });
   document.getElementById('wishSaveBtn').addEventListener('click', async ()=>{
@@ -2455,7 +2610,12 @@
     const author = document.getElementById('wAuthor').value.trim();
     if(!author){ document.getElementById('wAuthor').focus(); return; }
     const publisher = document.getElementById('wPublisher').value.trim();
-    wishlist.push({ id: uid(), title, author, publisher, dateAdded: todayStr() });
+    if(editingWishId){
+      const item = wishlist.find(w=>w.id===editingWishId);
+      if(item){ item.title = title; item.author = author; item.publisher = publisher; }
+    } else {
+      wishlist.push({ id: uid(), title, author, publisher, dateAdded: todayStr() });
+    }
     await saveWishlist();
     closeWishSheet();
     renderWishlist();
@@ -2961,6 +3121,7 @@
   const importFileInput = document.getElementById('importFileInput');
 
   document.getElementById('settingsBtn').addEventListener('click', ()=>{
+    refreshBackupInfo();
     settingsBackdrop.classList.add('open');
   });
   document.getElementById('closeSettingsBtn').addEventListener('click', ()=>{
@@ -2981,6 +3142,8 @@
     a.click();
     a.remove();
     setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    setLastBackupAt(new Date().toISOString());
+    refreshBackupInfo();
     settingsBackdrop.classList.remove('open');
     showConfirm('Backup file downloaded.', { confirmLabel:'OK', cancelLabel:null });
   });
@@ -3064,6 +3227,7 @@
     await loadWishlist();
     await loadLoans();
     renderMain();
+    updateSettingsDot();
     setupHomeScreenManifest();
   })();
 })();
