@@ -2077,8 +2077,16 @@
     const cloudHasWishlist = wishDoc.exists && Array.isArray(wishDoc.data().wishlist) && wishDoc.data().wishlist.length > 0;
     const cloudHasLoans = loansDoc.exists && Array.isArray(loansDoc.data().loans) && loansDoc.data().loans.length > 0;
 
-    await loadBooks(); await loadWishlist(); await loadLoans(); // read whatever's local, without touching the live `books`/etc used on screen
-    const localBooks = books, localWishlist = wishlist, localLoans = loans;
+    // Read local storage directly into throwaway variables — NOT via loadBooks()/
+    // loadWishlist()/loadLoans(), which assign straight into the same `books`/
+    // `wishlist`/`loans` globals the cloud listeners are driving. Doing that here
+    // would clobber whatever the cloud just delivered with this device's (often
+    // empty) local storage, and nothing would ever refresh it back since the
+    // listeners only refire on an actual remote change.
+    let localBooks = [], localWishlist = [], localLoans = [];
+    try{ localBooks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){}
+    try{ localWishlist = JSON.parse(localStorage.getItem(WISHLIST_STORAGE_KEY) || '[]'); }catch(e){}
+    try{ localLoans = JSON.parse(localStorage.getItem(LOANS_STORAGE_KEY) || '[]'); }catch(e){}
 
     const needsBooks = !cloudHasBooks && localBooks.length > 0;
     const needsWishlist = !cloudHasWishlist && localWishlist.length > 0;
