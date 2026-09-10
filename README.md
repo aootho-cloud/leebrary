@@ -3,7 +3,7 @@
 **Product name:** Leebrary
 **Tagline:** "a library that remembers"
 **Type:** Single-file, client-only mobile web app (installable as a home-screen PWA)
-**Version:** 2.0 — supersedes v1.0. Adds grid/list library views with month grouping, a recolored tag system, a "List" (buy list) tab, a "Lent" (lending tracker) tab with an overdue indicator, and a "Surprise me" popup. Removes nothing from v1.0's feature set.
+**Version:** 2.2 — supersedes v2.1. Adds a hierarchical **"Date added" filter** (Year → Month → Day) to the Filters sheet, letting the user narrow the Library to books added in a specific year, a specific month within that year, or a specific day within that month. Removes nothing from v2.1's feature set.
 **Audience for this document:** an engineer who has never seen the app, building it from scratch. Following this document exactly, with no deviations or personal interpretation, should produce a functionally and visually identical app.
 
 ---
@@ -29,11 +29,13 @@ The app must be deliverable as **one self-contained `.html` file** with no build
 - **Single HTML file.** All CSS lives in one `<style>` block in `<head>`. All JavaScript lives in one `<script>` block at the end of `<body>`, wrapped in an immediately-invoked function expression (IIFE) so nothing leaks to the global scope.
 - **No frameworks, no build tools.** Plain HTML/CSS/JavaScript (ES2017+ features are fine: `async/await`, template literals, arrow functions, `Set`, optional chaining not required).
 - **Rendering approach:** the app is a single-page app with no router. A `<main id="main">` element's `innerHTML` is fully re-rendered on every state change from one of five top-level "views": `library`, `progress`, `wishlist`, `lent`, `detail`. There is no virtual DOM — re-render means rebuilding an HTML string and setting `.innerHTML`, then re-attaching event listeners.
-- **Persistence:** three independent `localStorage` keys, each holding a `JSON.stringify`'d array, loaded on startup and saved after every mutation (no debounce, no batching):
-  - `leebrary_books_v1` — the book library (schema in section 4.1).
-  - `leebrary_wishlist_v1` — the buy list (schema in section 4.2).
-  - `leebrary_loans_v1` — the lending log (schema in section 4.3).
-  - On any parse failure for any key, fall back to an empty array for that key only.
+- **Persistence:** four independent `localStorage` keys, saved after every mutation (no debounce, no batching):
+  - `leebrary_books_v1` — the book library, a `JSON.stringify`'d array (schema in section 4.1).
+  - `leebrary_wishlist_v1` — the buy list, a `JSON.stringify`'d array (schema in section 4.2).
+  - `leebrary_loans_v1` — the lending log, a `JSON.stringify`'d array (schema in section 4.3).
+  - `leebrary_last_backup_v1` — **not** a JSON array; a single raw ISO 8601 timestamp string (`new Date().toISOString()`), written only when "Export backup file" succeeds. Absent until the very first successful export. Drives the backup-freshness indicator (section 15.1).
+  - On any parse failure for one of the three array-shaped keys, fall back to an empty array for that key only. A missing/unparseable `leebrary_last_backup_v1` is simply treated as "never backed up" — no error handling needed since it's read with a plain `localStorage.getItem`, not `JSON.parse`.
+- **Human-readable date formatting:** every stored date-only string (`"YYYY-MM-DD"`) shown to the user — as opposed to used internally for sorting, grouping, or `<input type="date">` values — must be rendered through a single shared `fmtDate(iso)` helper as **`DD-MM-YYYY`**, zero-padded (e.g. `05-09-2026`), computed from the date's local calendar fields (`getDate()`/`getMonth()`/`getFullYear()`), not `toLocaleDateString`. This is the one and only date-display format anywhere in the app: Library/Detail dates, Lent "Lent [date]"/"Returned [date]" lines, the Settings "Last backup" line, and Custom-range progress labels all go through this same helper. This is distinct from month-only labels (e.g. Progress period headers reading "September 2026", or the month `<select>`), which keep their full month-name + year format and are unaffected by this rule.
 - **Fonts:** Google Fonts, loaded via a single `<link>` tag:
   - `Source Serif 4` — weights available: 400, 600, 700, with optical-size axis `opsz` range `8..60`. Used for all headings, titles, big numbers, and anywhere a "book-ish" serif voice is wanted.
   - `Inter` — weights 400, 500, 600, 700. Used for all UI/body text.
@@ -70,18 +72,18 @@ Define these as CSS custom properties on `:root`. Every color used anywhere in t
 | `--rust` | `#A6483B` | Destructive actions (delete), filter-count badge, overdue-loan accent |
 | `--line` | `#E0CCD1` | Borders, dividers, inactive/empty elements, unfilled stars |
 | `--shadow` | `0 2px 10px rgba(43,34,48,0.08)` | Standard soft card/element shadow |
-| `--tag-red` | `#B14A3D` | "To read" status tag (text) |
-| `--tag-red-bg` | `#F5DBD7` | "To read" status tag (background); also the Overdue badge/pill background |
+| `--tag-red` | `#B14A3D` | "TBR" status tag (text) |
+| `--tag-red-bg` | `#F5DBD7` | "TBR" status tag (background); also the Overdue badge/pill background |
 | `--tag-yellow` | `#8A6A1D` | "Reading" status tag (text) |
 | `--tag-yellow-bg` | `#F8ECC6` | "Reading" status tag (background) |
-| `--tag-green` | `#3F7A4E` | "Read" (done) status tag (text) |
-| `--tag-green-bg` | `#DCEBDD` | "Read" (done) status tag (background) |
+| `--tag-green` | `#3F7A4E` | "Done" status tag (text) |
+| `--tag-green-bg` | `#DCEBDD` | "Done" status tag (background) |
 | `--tag-blue` | `#3A5F8C` | "Owned" ownership tag (text) |
 | `--tag-blue-bg` | `#DCE6F2` | "Owned" ownership tag (background) |
 | `--tag-violet` | `#6F4FA0` | "Borrowed" ownership tag (text) |
 | `--tag-violet-bg` | `#EBE1F7` | "Borrowed" ownership tag (background) |
 
-**Semantic tag-color rule (applies everywhere a status/ownership tag appears — list pills, grid dots, the detail page, the shareable book-card image, and the ownership toggle button):** status maps `to-read → red`, `reading → yellow`, `done → green`; ownership maps `owned → blue`, `borrowed → violet`. There is no other color mapping for these two dimensions anywhere in the app. The ownership toggle button on the detail page (`.tag-owner-btn`) reflects the *current* state via color — plain style (`--tag-blue-bg` / `--tag-blue`) when the book is currently owned (button offers "Mark borrowed"), solid `--tag-violet` fill with white text when currently borrowed (button offers "Mark owned").
+**Semantic tag-color rule (applies everywhere a status/ownership tag appears — list pills, grid dots, the detail page, the shareable book-card image, and the ownership toggle button):** status maps `to-read → red`, `reading → yellow`, `done → green`; ownership maps `owned → blue`, `borrowed → violet`. There is no other color mapping for these two dimensions anywhere in the app. These are the internal status *values* — the on-screen **labels** for them are **"TBR"**, **"Reading"**, and **"Done"** respectively (see the status-label rename in the version note above); only the label text changed, not the value, the color, or the CSS class name (`status-to-read`, `status-reading`, `status-done` are unchanged). The ownership toggle button on the detail page (`.tag-owner-btn`) reflects the *current* state via color — plain style (`--tag-blue-bg` / `--tag-blue`) when the book is currently owned (button offers "Mark borrowed"), solid `--tag-violet` fill with white text when currently borrowed (button offers "Mark owned").
 
 ### 3.2 Typography
 - Headings, titles, brand name, big stat numbers, sheet `<h2>` titles: `'Source Serif 4', serif`, weight 600–700.
@@ -90,7 +92,7 @@ Define these as CSS custom properties on `:root`. Every color used anywhere in t
 
 ### 3.3 Core components (describe visual spec precisely; exact CSS should mirror this)
 - **Segmented control** (`.segmented`): a full-width, rounded-11px track (`--paper-deep` background, 3px padding), containing flex buttons with no visible border; the active button gets a white-ish (`--card`) pill background and the standard shadow token, inactive buttons are transparent with `--ink-soft` text. A `.scroll` modifier variant allows horizontal scrolling with non-stretching buttons, used for the rating-filter row.
-- **Pills** (`.pill`): small fully-rounded (`border-radius:100px`) tags, 11px bold text, a small 5×5px solid dot before the label, used for status (to-read/reading/read) and ownership (owned/borrowed), colored per the semantic rule in 3.1. An additional `.overdue-pill` variant (`--tag-red-bg` background, `--tag-red` text, no leading dot) reads "Overdue" and appears only on active, overdue loan cards.
+- **Pills** (`.pill`): small fully-rounded (`border-radius:100px`) tags, 11px bold text, a small 5×5px solid dot before the label, used for status (TBR/Reading/Done) and ownership (owned/borrowed), colored per the semantic rule in 3.1. An additional `.overdue-pill` variant (`--tag-red-bg` background, `--tag-red` text, no leading dot) reads "Overdue" and appears only on active, overdue loan cards.
 - **Star rating display**: five `★` glyphs; filled stars colored `--brass`, unfilled colored `--line`. Two sizes: normal (14px, used on the detail page) and `.small` (12px, used on library tiles and grid tiles).
 - **Buttons** (`.btn`): rounded-9px, 1px `--line` border, `--card` background, `--ink` text, 12.5px bold. Modifiers: `.primary` (solid `--spine` bg, white text), `.tag-owner-btn` (see 3.1 for its two color states), `.danger-outline` (transparent bg, `--rust` border+text — used for Delete/Remove actions), `.danger-solid` (solid `--rust` bg, white text — used for the destructive confirm button in the custom confirm modal).
 - **Cards** (`.book-card`, `.wish-card`, `.loan-card`): `--card` background, 1px `--line` border, 14px radius, standard shadow, 14–15px padding. `.book-card` is fully tappable (`cursor:pointer`, subtle `scale(0.985)` active-press feedback, visible focus ring `:focus-visible { outline: 2px solid var(--spine) }`, `tabindex="0"` and `role="button"`, responds to `Enter`/`Space`). `.loan-card.returned` drops to `opacity:0.55` with no shadow (a visually "disabled" look for completed loans); `.loan-card.overdue` gets a `--tag-red` border instead of `--line`.
@@ -126,6 +128,8 @@ A single book is a plain JS object with this exact shape. Every field except `id
   review: string,        // free text, "" if none
   dateAdded: "YYYY-MM-DD",         // date-only ISO string, set once at creation, never changes
   dateFinished: "YYYY-MM-DD" | null, // date-only ISO string of the CURRENT/most recent read's completion, or null if not currently marked done
+  dateFinishedApprox: boolean,     // true only if dateFinished was captured via the "not sure of the exact date" year picker (add mode only — see 9.4); default false
+  dateFinishedApproxYear: number | null, // the year chosen in that picker, or null when dateFinishedApprox is false; used ONLY for display (section 10), never for sorting/grouping — dateFinished itself (a real "YYYY-07-02" placeholder date, see 9.4) is what sorting/grouping/progress stats use
   readHistory: string[]  // array of "YYYY-MM-DD" strings, one per completed read, in chronological order of when they were recorded (append-only; see section 9.3 for exact rules on when entries are added vs. corrected)
 }
 ```
@@ -175,7 +179,7 @@ Modal "sheets" (all using the same bottom-sheet visual pattern from section 3.3,
 5. **Backup & restore (Settings)** — opened by the gear icon in the header.
 6. **Add to your list** — opened by the FAB while on the List tab.
 7. **Lend a book** — opened by the FAB while on the Lent tab.
-8. **Surprise Me popup** — opened by the "🎲 Surprise me" button on the Library tab. Visually a sheet, but functionally distinct: it never sets `view`/`selectedBookId`, so the Library page underneath is untouched and still there the moment it closes.
+8. **Surprise Me popup** — opened by the "🎲 Choose a book to read" button on the Library tab. Visually a sheet, but functionally distinct: it never sets `view`/`selectedBookId`, so the Library page underneath is untouched and still there the moment it closes.
 
 ---
 
@@ -183,7 +187,7 @@ Modal "sheets" (all using the same bottom-sheet visual pattern from section 3.3,
 
 Fixed at the top of the app frame, not part of the scrolling content. Contains, left-to-right:
 - The wordmark (section 3.2) as a heading, with a tagline directly beneath it in small muted text: **"a library that remembers"**.
-- A circular-cornered icon button on the far right (gear/settings icon, using a standard 24×24 viewBox "settings" SVG glyph — two concentric shapes: a small circle plus the classic 8-notch gear outline, stroked not filled, `currentColor`), which opens the Backup & Restore sheet.
+- A circular-cornered icon button on the far right (gear/settings icon, using a standard 24×24 viewBox "settings" SVG glyph — two concentric shapes: a small circle plus the classic 8-notch gear outline, stroked not filled, `currentColor`), which opens the Backup & Restore sheet. This button also carries a small red notification dot (`.header-dot`, same visual language and positioning convention as the Lent tab's `.tab-dot`, but anchored to the icon button's own top-right corner rather than a tab-bar item) whenever the backup is stale or has never happened — see section 15.1 for the exact rule and how it's kept in sync.
 
 A 1px bottom border (`--line`) separates the header from the content area.
 
@@ -195,11 +199,11 @@ Rendered top-to-bottom inside `<main>`:
 
 ### 7.1 Quick filter row
 A `.quick-filter-row` containing:
-- A 3-option segmented control: **All / To read / Done**. This controls only the `status` dimension and is a convenience shortcut for the two most common single-status views (it intentionally does NOT include "Reading" as a quick option — that's only reachable via the Filters sheet).
+- A 3-option segmented control: **All / TBR / Done**. This controls only the `status` dimension and is a convenience shortcut for the two most common single-status views (it intentionally does NOT include "Reading" as a quick option — that's only reachable via the Filters sheet).
   - Clicking **All** clears the status filter set entirely.
-  - Clicking **To read** sets the status filter to exactly `{"to-read"}`.
+  - Clicking **TBR** sets the status filter to exactly `{"to-read"}`.
   - Clicking **Done** sets the status filter to exactly `{"done"}`.
-  - The segmented control's active button reflects the CURRENT filter state: "All" is active only when the status-filter set is empty; "To read"/"Done" are active only when the set is exactly that single value. If the set holds any other combination (e.g. "Reading" alone, or multiple statuses together, set via the Filters sheet), none of the three quick buttons show as active — this is expected and correct.
+  - The segmented control's active button reflects the CURRENT filter state: "All" is active only when the status-filter set is empty; "TBR"/"Done" are active only when the set is exactly that single value. If the set holds any other combination (e.g. "Reading" alone, or multiple statuses together, set via the Filters sheet), none of the three quick buttons show as active — this is expected and correct.
 - A funnel-icon button (40×40 rounded-square) that opens the Filters sheet. If any filter is active that ISN'T representable by the quick row, show a small red numeric badge in the button's top-right corner. The badge count = (number of selected ownership filters) + (number of selected rating filters) + (1 if "Reading" is among the selected statuses, else 0). This is an approximate "how much extra filtering beyond the quick row is active" indicator, not a strict total.
 - A view-mode toggle button (same 40×40 style), showing a grid glyph when currently in list view (tapping switches to grid) or a list glyph when currently in grid view (tapping switches to list). State: `libraryViewMode`, `"list" | "grid"`, default `"list"`.
 
@@ -208,14 +212,14 @@ A `.sort-row` with a label on the left reading **"Sort by added date"** or **"So
 
 **Which field is used is fully automatic, never user-chosen directly:**
 - If the current status-filter set is EXACTLY `{"done"}` (i.e., the user is viewing only Done books — whether via the quick "Done" button or via the Filters sheet), sort by **done date** (the most recent entry in `getReadDates(book)`, or empty string if none).
-- In every other case (All, To read, Reading, or any other combination), sort by **added date** (`dateAdded`).
+- In every other case (All, TBR, Reading, or any other combination), sort by **added date** (`dateAdded`).
 
 Clicking the direction toggle flips between `desc` (recent-first) and `asc` (oldest-first) and re-renders; it does not affect which field is used.
 
 **Sort algorithm, exact:** compare the two books' string sort-keys (either both `dateAdded` values or both "most recent done date" values, per the rule above) with `localeCompare`, in the direction implied by `sortDir`. **Critically, if the two keys are equal** (e.g. two books both added "today", since the field only has day-level granularity) **fall back to comparing the millisecond timestamp embedded in each book's `id`** (section 4.1), in the same direction as the primary sort. Without this tiebreaker, same-day entries would silently fail to respond to the direction toggle at all (this was a real, user-reported bug during development — do not omit this fallback).
 
 ### 7.3 Surprise me button
-A full-width button directly below the sort row: **"🎲 Surprise me from your to-read pile"**. See section 17 for its behavior.
+A full-width button directly below the sort row: **"🎲 Choose a book to read"**. See section 17 for its behavior (the button's label is the only user-facing wording change from the original "Surprise me from your to-read pile" copy — its pool and randomization logic are unchanged: it still only draws from TBR-status books).
 
 ### 7.4 Search box
 A single text input, placeholder **"Search title or author"**, filtering case-insensitively against the concatenation of `title + ' ' + author`. Typing must not lose focus or cursor position on re-render (re-focus the input and restore cursor to the end after each keystroke's re-render).
@@ -250,17 +254,23 @@ Bottom-right "+" button, opens the Add/Edit sheet in "add" mode (no book passed 
 
 ## 8. Filters Sheet
 
-Opened via the funnel icon. Title: **"Filters"**. Three independently multi-selectable chip groups (tapping a chip toggles its membership in the corresponding `Set` state — multiple chips within a group can be active simultaneously, and combining criteria across groups is a logical AND):
+Opened via the funnel icon. Title: **"Filters"**. Three independently multi-selectable chip groups (tapping a chip toggles its membership in the corresponding `Set` state — multiple chips within a group can be active simultaneously, and combining criteria across groups is a logical AND), plus a fourth, hierarchical date-drill-down control:
 
-1. **"Reading status"** — chips: To read / Reading / Done.
+1. **"Reading status"** — chips: TBR / Reading / Done.
 2. **"Ownership"** — chips: Owned / Borrowed.
 3. **"Rating"** — chips: ★1 / ★2 / ★3 / ★4 / ★5. Selecting a rating chip means "books rated exactly this many stars" (selecting several means "rated any of these values" — it is NOT a minimum threshold).
+4. **"Date added"** — three side-by-side `<select>` dropdowns (Year / Month / Day), filtering on `dateAdded` and letting the user drill down from a whole year, to a specific month within that year, to a specific day within that month:
+   - **Year** — defaults to **"Any year"**. Its options are every distinct year present across all books' `dateAdded` values, descending (most recent first), plus the current real-world year even if no book was added in it yet (so the option is never simply missing on a near-empty library). Selecting a year immediately filters the Library to books added in that year, with month/day left at "Any" — this alone satisfies "see the books added in a particular year."
+   - **Month** — disabled and shows only **"Any month"** until a specific year is chosen; once a year is picked, it's enabled and populated with all 12 full month names. Selecting a month further narrows the filter to that year+month — "books from a month on a particular year."
+   - **Day** — disabled and shows only **"Any day"** until a specific month is chosen; once a month is picked, it's enabled and populated `1..N`, where `N` is the actual number of days in the selected year+month (so February correctly offers 28 or 29 depending on the year, April offers 30, etc.) — never a flat, sometimes-wrong 31. Selecting a day narrows the filter to that exact year+month+day — "a particular day of month of year."
+   - Choosing a coarser value resets everything finer beneath it back to "Any": picking a different year clears both month and day back to "Any"; picking a different month clears day back to "Any". This keeps the three selects always in a valid, non-contradictory state (there's no way to end up with a day selected but no month, for instance).
+   - A book with no `dateAdded` at all can never match a non-"Any" year (there is no legacy data shape where this happens in practice, since `dateAdded` is required at creation, but the filter treats it defensively as "doesn't match" rather than throwing).
 
-Below the three groups, two full-width action buttons:
-- **"Clear all"** — empties all three filter sets and immediately updates the chip active-states and the live count (does not close the sheet).
+Below the four groups, two full-width action buttons:
+- **"Clear all"** — empties all three chip filter sets, resets Year/Month/Day back to "Any"/disabled, and immediately updates the chip active-states, the date selects, and the live count (does not close the sheet).
 - **"Show N book(s)"** (this button's own label is dynamic, always reflecting the live count of books that would match the CURRENTLY toggled — not yet applied — filter state, combined with the current search term) — tapping it closes the sheet and re-renders the Library list with the new filters applied.
 
-Filtering logic used both for the live count in this sheet and for the actual Library list: a book matches if (status set is empty OR its status is in the set) AND (ownership set is empty OR its owned/borrowed state is in the set) AND (rating set is empty OR its rating is in the set) AND (search term is empty OR title+author contains it, case-insensitive).
+Filtering logic used both for the live count in this sheet and for the actual Library list: a book matches if (status set is empty OR its status is in the set) AND (ownership set is empty OR its owned/borrowed state is in the set) AND (rating set is empty OR its rating is in the set) AND (Year is "Any" OR `dateAdded`'s year matches, AND — only if Year is set — Month is "Any" OR `dateAdded`'s month matches, AND — only if Month is set — Day is "Any" OR `dateAdded`'s day matches) AND (search term is empty OR title+author contains it, case-insensitive). The funnel icon's badge count (section 7.1) also increments by 1 whenever Year is set to something other than "Any", the same way it already does for "Reading" among the status chips — it's an approximate "extra filtering beyond the quick row" indicator, not a strict total, so Month/Day being set on top of an already-counted Year does not add further to the badge.
 
 ---
 
@@ -274,8 +284,8 @@ Fields, in this exact order:
 3. **Cover image (optional)** — a file input (`accept="image/*"`, hidden) triggered by a dashed-border "Choose a photo" label-button. On selection:
    - Read the file, load it into an `Image`, and **resize/compress it client-side before storing**: scale so the longer edge is at most **320px** (preserve aspect ratio), draw to an off-screen `<canvas>`, and export via `canvas.toDataURL('image/jpeg', 0.72)`. This keeps stored covers small since everything lives in `localStorage`.
    - Once set, show a 52×72px preview thumbnail plus a "Remove" button (which clears the cover and re-shows the "Choose a photo" control).
-4. **Status** — a 3-button single-select group: To read / Reading / Read (internal value `"done"`). Choosing "Read" reveals field 5.
-5. **Date finished** (only visible when status = Read) — a native date input, defaulting to today's date when first shown.
+4. **Status** — a 3-button single-select group: TBR / Reading / Done (internal value `"done"`). Choosing "Done" reveals field 5.
+5. **Finished-date block** (only visible when status = Done) — see section 9.4 for its full, order-sensitive spec. In short: a "Not sure of the exact date" toggle sits ABOVE the date field it controls, and — critically — this whole toggle is only ever offered in **add mode**; in **edit mode** it is hidden outright and the field always behaves as a plain date input, regardless of whether the book being edited currently has an approximate date on file.
 6. **Borrowed copy** — a toggle switch (default off = owned).
 7. **Your rating (optional)** — five tappable star buttons (unfilled `--line`, filled `--brass` up to the chosen value). Tapping the currently-selected star again clears the rating back to 0 (there is no separate "clear rating" control).
 8. **Notes / review (optional)** — a multi-line textarea, placeholder "What stood out to you?".
@@ -286,15 +296,29 @@ Footer: **"Cancel"** (closes without saving) and **"Save book"** (primary).
 Block saving (and focus the offending field) if Title or Author is empty after trimming whitespace. Every other field may be left at its default.
 
 ### 9.2 Save logic — new book
-Push a new book object with a fresh `uid()`, `dateAdded` = today, and: if status is "done", `dateFinished` = the chosen finish date AND `readHistory` = `[thatDate]`; otherwise `dateFinished = null` and `readHistory = []`.
+Push a new book object with a fresh `uid()`, `dateAdded` = today, and: if status is "done", `dateFinished` = the resolved finish date (section 9.4 — either the exact date typed, or the `YYYY-07-02` placeholder derived from the chosen year), `dateFinishedApprox`/`dateFinishedApproxYear` set per 9.4, AND `readHistory` = `[thatDate]`; otherwise `dateFinished = null`, `dateFinishedApprox = false`, `dateFinishedApproxYear = null`, and `readHistory = []`.
 
 ### 9.3 Save logic — editing an existing book (exact rule, do not simplify)
 - Update title/author/status/borrowed/cover/rating/review directly from the form.
+- Because the approximate-date toggle is never offered in edit mode (field 5 above), the finish date resolved on save is always the plain date input's value — treat it exactly as an exact date, never as approximate, no matter what the book's stored `dateFinishedApprox` was before this edit.
 - If the new status is **"done"**:
   - If the book's status was ALREADY "done" before this edit (i.e. you're editing an already-finished book, not freshly completing it) AND it already has at least one `readHistory` entry: **overwrite the LAST entry** in `readHistory` with the chosen finish date, and set `dateFinished` to that same date. (Rationale: the user is correcting the date of the read they're currently editing, not logging a brand-new read.)
   - Otherwise (the book is transitioning INTO "done" status via this edit, from "to-read" or "reading"): **append** the chosen finish date as a NEW entry to `readHistory`, and set `dateFinished` to it. (Rationale: this is a genuinely new completion event.)
-- If the new status is NOT "done": set `dateFinished = null`. **Never delete or modify `readHistory` in this branch** — past completions must remain on permanent record even if the book's current status is reset back to "reading" or "to-read".
+  - Either way, set `dateFinishedApprox = false` and `dateFinishedApproxYear = null` — an edit always resolves to a concrete date, even if the book previously carried an approximate one from when it was first added.
+- If the new status is NOT "done": set `dateFinished = null`, `dateFinishedApprox = false`, `dateFinishedApproxYear = null`. **Never delete or modify `readHistory` in this branch** — past completions must remain on permanent record even if the book's current status is reset back to "reading" or "to-read".
 - After saving an edit, return the user to the Book Detail view (not the Library list) — editing is only ever reached FROM the detail page in this app (there is no edit entry point on the library tile itself), so it should feel like "the detail page updated," not "you navigated away."
+- The "Mark done" quick action on the Detail page (section 10, item 8) is a separate code path from this sheet and always produces a fresh, exact completion — it also resets `dateFinishedApprox = false` / `dateFinishedApproxYear = null` for the same reason.
+
+### 9.4 The "not sure of the exact date" option (add mode only)
+This exists for logging backlogged books — ones already finished, sometimes years ago, where the user has no idea of the specific day.
+
+- **Only shown when adding a new book**, never when editing (see field 5 above and section 9.3). The rationale: once a book is in the library, editing it is about correcting/updating a record you can already see in full, including whatever date is on file — there's no reason to re-offer "I don't know the date" for a book that already has *some* date, exact or not.
+- Layout, top to bottom, inside the "Done" branch of field 5: a toggle switch row reading **"Not sure of the exact date"** first, then — depending on its state — either:
+  - **Off (default):** a plain **"Date finished"** label + native date input, defaulting to today's date.
+  - **On:** the date input (and its label) are hidden entirely and replaced by a **"Year finished"** `<select>`, populated with the current year down through the previous 60 years (current year first, descending), defaulting to the current year.
+- **On save, if the toggle is on:** resolve the finish date as a placeholder string `` `${chosenYear}-07-02` `` (July 2nd — an arbitrary, roughly mid-year date chosen so the entry still sorts/groups into the correct calendar year everywhere: sort-by-done-date, month/year grouping on the Library tab, and the Progress tab's charts all key off this real date string exactly like any exact one). Set `dateFinishedApprox = true` and `dateFinishedApproxYear = chosenYear` on the book.
+- **On save, if the toggle is off:** resolve the finish date from the date input as normal (fallback to today if somehow empty). Set `dateFinishedApprox = false` and `dateFinishedApproxYear = null`.
+- **Display implication (see section 10):** wherever this specific finish date would otherwise be shown as "[date]", show **"sometime in [year]"** instead, whenever `dateFinishedApprox` is true AND the date being displayed is the book's current `dateFinished` value. This only ever applies to the single most-recent completion recorded on the book — a book's older `readHistory` entries are never shown as approximate even if the book's current entry is, since the approximate flag is a single per-book field, not per-history-entry.
 
 ---
 
@@ -309,19 +333,19 @@ Layout, top to bottom:
 3. **Hero row**: a large (104×148px) cover image or gradient-placeholder, next to the title (21px serif bold) and author (13.5px muted) stacked beside it.
 4. **Pill row**: status pill + ownership pill (identical rules and colors to the library tile).
 5. **Star row** (only if rated).
-6. **Dates line** — normally reads **"Added [date] · Finished [date]"** (omitting the "· Finished" part if not currently done). **Special case:** if the book's `dateFinished` is earlier than its `dateAdded`, show **only** "Finished [date]", omitting the "Added" part entirely.
-7. **Reread note** (only shown when the book's CURRENT status is not "done" AND it has at least one prior read in `readHistory`): a small italic line, e.g. *"Read 2 times before · last finished [date]"*.
+6. **Dates line** — normally reads **"Added [date] · Finished [date]"** (omitting the "· Finished" part if not currently done). **Special case:** if the book's `dateFinished` is earlier than its `dateAdded`, show **only** "Finished [date]", omitting the "Added" part entirely. **Approximate-date case:** wherever this "[date]" placeholder is the book's `dateFinished` value AND `dateFinishedApprox` is true, render it as **"sometime in [dateFinishedApproxYear]"** instead of a formatted date (section 9.4). `dateAdded` itself is never approximate — only the finished date can be.
+7. **Reread note** (only shown when the book's CURRENT status is not "done" AND it has at least one prior read in `readHistory`): a small italic line, e.g. *"Read 2 times before · last finished [date]"* — the same approximate-date substitution from item 6 applies here too, when the "last finished" date being shown equals the book's (approximate) `dateFinished`.
 8. **Status action row** — buttons depend on current status:
    - `to-read`: "Start reading" + "Mark done" (primary)
    - `reading`: "Mark done" (primary) only
    - `done`: "Reopen" only
    - Always also present: the ownership toggle button (`.tag-owner-btn`, section 3.1), reading "Mark borrowed" (if currently owned) or "Mark owned" (if currently borrowed).
-   - **"Mark done" behavior:** set status to "done", set `dateFinished` to today's date, and **append today's date as a new `readHistory` entry** — always a fresh completion event regardless of prior history.
+   - **"Mark done" behavior:** set status to "done", set `dateFinished` to today's date, clear `dateFinishedApprox`/`dateFinishedApproxYear` back to `false`/`null` (a fresh completion is always exact, never approximate), and **append today's date as a new `readHistory` entry** — always a fresh completion event regardless of prior history.
    - **"Reopen" behavior:** set status back to "reading" and clear `dateFinished` to `null`. **Do not touch `readHistory`.**
    - **"Start reading"**: sets status to "reading", nothing else changes.
    - **Ownership toggle**: flips the boolean, nothing else changes.
 9. **Review** (only if present): a labeled "Notes" section with the review text as a paragraph.
-10. **Read history list** (only rendered if `readHistory.length > 1`): a small ordered list, one line per entry, formatted **"1st time — [date]"**, **"2nd time — [date]"**, etc. (proper English ordinals).
+10. **Read history list** (only rendered if `readHistory.length > 1`): a small ordered list, one line per entry, formatted **"1st time — [date]"**, **"2nd time — [date]"**, etc. (proper English ordinals). The same approximate-date substitution applies per-entry: only the entry whose date equals the book's current `dateFinished`, on a book with `dateFinishedApprox` true, renders as "sometime in [year]" — every other entry in the list always renders as a normal formatted date, since the approximate flag is a single per-book field and cannot describe older, already-superseded entries.
 11. **Lent out section** (only rendered if at least one loan record references this book's id): a labeled "Lent out" list, one line per matching loan record sorted most-recent-lent-first, each formatted either **"[person] — still out (lent [date])"** or **"[person] — returned [date]"**.
 12. **Footer row** — three equal-width buttons: **"Share"**, **"Edit"**, **"Delete"** (styled `.danger-outline`).
     - Share → generates and offers the book's shareable image (section 13.1).
@@ -371,11 +395,13 @@ There is no "recap"/"year in review" feature — this was tried during developme
 A simple, standalone wishlist of books the user intends to buy — entirely separate from the main library and never automatically synced to it except via the explicit "Mark as bought" action.
 
 - **Search box** at the top: placeholder "Search title, author, or publisher", filters case-insensitively against `title + ' ' + author + ' ' + publisher`. Same focus/cursor-preservation behavior as the Library search.
+- **Count row** directly beneath the search box, shown only when the wishlist is non-empty: **"N book(s) on your list"**, where N is the TOTAL wishlist count regardless of the search term — when a search is active and narrows the visible set, append **" · M shown"** (M = the filtered count), so the user can always see both "how many total" and "how many currently visible" at once. Not shown at all when the wishlist is empty (the empty state below covers that).
 - **Empty states:** if the wishlist is empty outright: glyph "🛒", title **"Your list is empty"**, subtitle **"Tap the + button to add a book you want to buy."** If items exist but none match the search: glyph "🛒", title **"No books match"**, subtitle **"Try a different search."**
-- **List items**, sorted most-recently-added first, each a `.wish-card` showing: title (serif, 16.5px), author (muted, 13px) if present, publisher (muted, 11.5px, *italic*) if present, and two action buttons:
-  - **"Mark as bought"** (primary) — pushes a brand-new book into the main library array: `title`/`author` copied from the wishlist entry, `status: "to-read"`, `borrowed: false`, `cover: null`, `rating: 0`, `review: ""`, `dateAdded` = today, `dateFinished: null`, `readHistory: []`. **The publisher field is discarded entirely** — it never travels to the book record. The wishlist entry is then removed from the wishlist array. Both arrays are persisted.
+- **List items**, sorted most-recently-added first, each a `.wish-card` showing: title (serif, 16.5px), author (muted, 13px) if present, publisher (muted, 11.5px, *italic*) if present, and three action buttons:
+  - **"Mark as bought"** (primary) — pushes a brand-new book into the main library array: `title`/`author` copied from the wishlist entry, `status: "to-read"`, `borrowed: false`, `cover: null`, `rating: 0`, `review: ""`, `dateAdded` = today, `dateFinished: null`, `dateFinishedApprox: false`, `dateFinishedApproxYear: null`, `readHistory: []`. **The publisher field is discarded entirely** — it never travels to the book record. The wishlist entry is then removed from the wishlist array. Both arrays are persisted.
+  - **"Edit"** — opens the same "Add to your list" sheet described below, but in edit mode: title becomes **"Edit list entry"**, the primary footer button's label changes from "Add to list" to **"Save changes"**, and all three fields are pre-filled from the entry being edited. Saving updates that entry's `title`/`author`/`publisher` in place (its `id` and `dateAdded` never change) rather than pushing a new one; the same required-field validation as add mode applies. This is the only way to correct a mistyped title/author/publisher on an existing list entry — there is no inline editing on the card itself.
   - **"Remove"** (`.danger-outline`) — opens the custom confirm modal, message `Remove "[title]" from your list?`, confirm label "Remove". On confirm, the wishlist entry is deleted outright. **This never touches the library** — a manually removed wishlist item is gone, full stop, and is never added to the book library under any circumstance.
-- **Add to your list sheet** (opened by the FAB while on this tab): fields **Title*** (required), **Author*** (required), **Publisher (optional)**. Same red-asterisk / trim-and-block-on-empty validation as the book sheet, but only for Title and Author. Footer: "Cancel" / "Add to list" (primary). On save, pushes `{ id: uid(), title, author, publisher, dateAdded: today }` onto the wishlist array.
+- **Add to your list sheet** (opened by the FAB while on this tab, in add mode — the FAB always adds, never edits): fields **Title*** (required), **Author*** (required), **Publisher (optional)**. Same red-asterisk / trim-and-block-on-empty validation as the book sheet, but only for Title and Author. Footer: "Cancel" / "Add to list" (primary). On save, pushes `{ id: uid(), title, author, publisher, dateAdded: today }` onto the wishlist array. See "Edit" above for this same sheet's edit-mode behavior.
 
 ---
 
@@ -388,6 +414,8 @@ A book can be selected for a new loan only if **both**: (a) `borrowed === false`
 
 ### 13.2 Search + quick filter
 A 3-option segmented control **All / Active / Returned** filters by loan status. A search box (placeholder "Search book or person") filters case-insensitively against `bookTitle + ' ' + bookAuthor + ' ' + personName`. Both apply together (logical AND) before the loans are split into the three display sections below.
+
+Directly beneath the search box, shown only when at least one loan record exists (regardless of the current search/filter): a count row reading **"N book(s) currently lent out"**, where N = `loans.filter(l => !l.returned).length` computed over the **full, unfiltered** loans array — same "always the true total, independent of whatever search/quick-filter is currently applied" principle as section 13.7's tab-bar dot, and the same principle behind the List tab's count row (section 12).
 
 ### 13.3 Overdue rule
 A loan is **overdue** if it is not yet returned AND at least **30 days** (`OVERDUE_DAYS = 30`, measured as whole calendar days between `dateLent` and today) have passed since it was lent. This is purely a display concept — it does not change any stored data, only how a loan renders.
@@ -456,12 +484,24 @@ Opened via the header's gear icon. Title: **"Backup & restore"**, with an explan
 
 > "Your library is saved only in this browser. To use it somewhere else — another browser, or your phone as well as a computer — export a backup file here, then import it there. Importing adds any books not already in your library; it won't duplicate ones that are."
 
+Directly below that paragraph (before the two action buttons):
+- A **"Last backup: [date]"** line, or **"Last backup: never"** if `leebrary_last_backup_v1` has never been written. Uses the same `fmtDate` DD-MM-YYYY formatting as everywhere else (section 2), applied to the date portion of the stored ISO timestamp.
+- Immediately after it, shown only when the backup is stale (section 15.1): a red-tinted inline warning banner (⚠️ icon + text) reading, if a backup exists, **"It's been over 7 days since your last backup. Export one now to keep your library safe."**, or, if none has ever happened, **"You haven't backed up your library yet. Export a backup file to keep it safe."**
+- Both this line and the warning banner are refreshed every time the sheet is opened (not just once on app load), so exporting and then immediately reopening Settings always reflects the just-completed backup with no stale state.
+
 Two full-width stacked buttons:
-- **"Export backup file"** — builds `{ app: "leebrary", version: 1, exportedAt: <today's date>, books: <the full current books array> }`, serializes it with 2-space indentation, wraps it in a `Blob` (`application/json`), and triggers a download named `leebrary-backup-<today's date>.json`. (This export currently covers the book library only — the wishlist and loans arrays are not included in the backup payload.)
+- **"Export backup file"** — builds `{ app: "leebrary", version: 1, exportedAt: <today's date>, books: <the full current books array> }`, serializes it with 2-space indentation, wraps it in a `Blob` (`application/json`), and triggers a download named `leebrary-backup-<today's date>.json`. (This export currently covers the book library only — the wishlist and loans arrays are not included in the backup payload.) **On a successful export**, also write `new Date().toISOString()` to `leebrary_last_backup_v1` and immediately refresh both the "Last backup" line/warning banner in this sheet and the gear icon's dot (section 15.1) — all three must update together, in the same click handler, with no separate save step.
 - **"Import backup file"** — opens a hidden file input (`accept="application/json,.json"`). On file selection, read it as text, `JSON.parse` it (accepting either a raw array, or an object with a `.books` array), and:
   - If parsing fails or the result isn't array-shaped: show the confirm/alert modal with a single "OK" button reading **"That file could not be read as a Leebrary backup."**
   - Otherwise, compute which incoming books are genuinely new (must have an `id`, a `title`, and an `id` not already present among current books). If zero are new: show a single-button notice **"All N book(s) in that file are already in your library — nothing new to import."** Otherwise show a yes/no confirmation: **"Found N book(s) in that file — X new, Y already in your library. Import the X new one(s)?"**, confirm label "Import" — on confirm, push all the new ones into the array, persist, close the settings sheet, and re-render.
+  - **Importing does NOT count as a backup** — it never writes `leebrary_last_backup_v1`. Only a successful export does. (Rationale: the freshness indicator specifically tracks "do you have an up-to-date copy of your data safely exported elsewhere," which importing doesn't establish.)
 - Below both, a plain **"Close"** button.
+
+### 15.1 Backup-freshness rule (gear icon dot + in-sheet warning)
+- Constant: `BACKUP_WARNING_DAYS = 7`.
+- **Stale** = `leebrary_last_backup_v1` is absent, OR at least 7 whole calendar days have passed between the stored timestamp and now (same day-counting approach as the Lent tab's `OVERDUE_DAYS` rule in section 13.3, just against a full timestamp rather than a date-only string).
+- Whenever the app considers itself stale, show the gear icon's red dot (section 6) AND the in-sheet warning banner (above). Whenever it's fresh (a backup within the last 7 days exists), both are hidden.
+- The gear icon's dot must be computed and shown/hidden **on initial app load** (so opening the app after a long gap immediately shows it, without requiring the user to open Settings first) and **re-checked every time an export succeeds** (so exporting immediately clears it). It does not need to be re-checked on a timer while the app sits open — a fresh page load or a successful export are the only two triggers.
 
 ---
 
@@ -477,7 +517,7 @@ Tapping the backdrop (outside the sheet) or the cancel button both simply close 
 
 ## 17. Surprise Me Popup
 
-Triggered by the "🎲 Surprise me from your to-read pile" button on the Library tab (section 7.3).
+Triggered by the "🎲 Choose a book to read" button on the Library tab (section 7.3).
 
 1. Compute the pool: every book in the library with `status === "to-read"`.
 2. If the pool is empty: show the custom Confirm/Alert modal (single "OK" button) reading **"Your to-read pile is empty — add some books first!"** — do not open the popup.
@@ -501,6 +541,7 @@ Track these pieces of top-level state (plain variables, no external state librar
 - `selectedBookId`: the book currently shown in detail view, or null.
 - `libraryViewMode`: `"list" | "grid"`.
 - `statusFilters`, `ownerFilters`, `ratingFilters`: `Set` instances for the multi-select Library filters.
+- `filterYear`, `filterMonth`, `filterDay`: number or `null` each (`null` = "Any") — the hierarchical Date-added drill-down filter (section 8, item 4). `filterMonth` is only meaningful when `filterYear` is set, and `filterDay` only when `filterMonth` is set; the app enforces this by resetting finer fields to `null` whenever a coarser one changes.
 - `searchTerm`: string — Library search.
 - `sortDir`: `"desc" | "asc"` — Library sort direction.
 - `wishSearchTerm`: string — List tab search.
@@ -510,6 +551,7 @@ Track these pieces of top-level state (plain variables, no external state librar
 - `progressYear`, `progressMonth`: numbers, shared between the Month and Year progress views.
 - `customFrom`, `customTo`: date strings for the Custom progress view.
 - `editingId`: the id of the book currently being edited via the Add/Edit sheet, or null when adding a new one.
+- `editingWishId`: the id of the List entry currently being edited via the "Add to your list" sheet's edit mode (section 12), or null when adding a new one — same pattern as `editingId` above, one level down for the wishlist.
 - `surpriseBookId`: the id of the book currently shown in the Surprise Me popup, or null when it's closed.
 - `OVERDUE_DAYS`: constant, `30`.
 
@@ -524,23 +566,27 @@ An implementation is complete when all of the following hold:
 - [ ] Opening the file directly (no server) works fully offline except for the two Google Fonts.
 - [ ] Adding a book with only a title and author succeeds; every other field can be left untouched. The same holds for adding a wishlist entry (title/author required, publisher optional) and lending a book (book + person required).
 - [ ] The book tile — in both list and grid view — shows exactly: cover/placeholder, title, author, one status tag, one ownership tag, and stars only if rated.
-- [ ] Status tags are red (to-read) / yellow (reading) / green (done); ownership tags are blue (owned) / violet (borrowed) — consistently across list pills, grid dots, the detail page, the ownership toggle button, and the shareable book-card image.
+- [ ] Status tags read **TBR** / **Reading** / **Done** and are colored red (to-read) / yellow (reading) / green (done); ownership tags are blue (owned) / violet (borrowed) — consistently across list pills, grid dots, the detail page, the ownership toggle button, the shareable book-card image, the status-choice buttons in the Add/Edit sheet, and the Filters sheet's status chips.
 - [ ] Toggling list/grid view preserves the current filters, search, sort, and month grouping.
 - [ ] A "to-read"/"reading" book always appears under the current month's group, never under the month it was added, no matter how old its `dateAdded` is; a "done" book appears under its most recent completion's month.
 - [ ] Tapping a tile (list or grid) opens its detail page; Prev/Next there step through the same filtered/sorted set as the Library list (unaffected by month grouping); Back returns to Library.
 - [ ] Marking a book done today, reopening it, and marking it done again produces TWO entries in `readHistory` and the detail page's "Read history" section lists both with correct ordinals and dates.
 - [ ] A book logged with a finish date earlier than today (its add date) shows only "Finished [date]" with no "Added" text.
+- [ ] Adding a NEW book with status Done and the "Not sure of the exact date" toggle on shows a year picker instead of a date input, saves a `dateFinished` of `YYYY-07-02` for the chosen year, and the detail page shows "sometime in [year]" instead of a formatted date wherever that finish date would otherwise appear. The same toggle is completely absent when EDITING an existing book, regardless of whether that book currently has an approximate date on file.
+- [ ] Every human-readable date shown anywhere in the app (Library/Detail dates, Lent lend/return dates, Settings' last-backup date, Custom-range progress labels) renders as `DD-MM-YYYY`, e.g. `05-09-2026` — never a month-name format, and never the raw `YYYY-MM-DD` storage format.
 - [ ] Deleting a book, removing a wishlist entry, and removing a loan record all show the custom confirm modal (never a native browser dialog) and actually perform the deletion on confirm.
 - [ ] Sorting toggles direction correctly even when several books share the exact same added (or done) date, thanks to the id-timestamp tiebreaker.
 - [ ] Switching the quick filter to "Done" changes the sort label to "Sort by done date" automatically; every other filter state sorts by added date.
 - [ ] The Filters sheet supports selecting multiple chips per group simultaneously and its "Show N books" button count updates live as chips are toggled.
+- [ ] The Filters sheet's "Date added" Year/Month/Day selects correctly drill down: picking only a year shows every book added in that year; additionally picking a month narrows to that year+month; additionally picking a day narrows to that exact date. Month is disabled until a year is chosen and Day is disabled until a month is chosen; picking a new year resets Month/Day back to "Any", and picking a new month resets Day back to "Any". The Day select's option count correctly adapts to the chosen month/year (e.g. February shows 28 or 29 days depending on leap year).
 - [ ] Progress → Month has a working month dropdown and shares the year arrows with the Year view; Year shows a 12-bar chart; Custom requires both dates before showing results; All time buckets by year. No "Year in reading"/recap feature exists anywhere.
 - [ ] Both "Share" buttons (book detail, progress) produce a themed PNG, colored consistently with the current tag palette, and either open the native share sheet or the in-app preview/download modal.
 - [ ] Export produces a valid, re-importable JSON file; importing it into a fresh/different browser storage merges by id without duplicating.
 - [ ] The whole app fits the viewport with no page-level scroll; only the content area scrolls when a list is long.
 - [ ] A home-screen "Add to Home Screen"/install shows the custom "L" monogram icon, not a generic browser icon or webpage screenshot.
-- [ ] On the List tab, "Mark as bought" creates a to-read library book from title+author only (publisher discarded) and removes the wishlist entry; manually removing a wishlist entry never creates a library book.
+- [ ] On the List tab, "Mark as bought" creates a TBR library book from title+author only (publisher discarded) and removes the wishlist entry; manually removing a wishlist entry never creates a library book. The tab shows a live "N books on your list" count (plus "· M shown" while a search narrows the view), and each entry's "Edit" button reopens the same sheet pre-filled, updating that entry in place rather than creating a duplicate.
 - [ ] On the Lent tab, the book picker in "Lend a book" excludes borrowed copies and books already out on an active loan; selecting a book auto-fills its author preview with no typing.
 - [ ] Marking a loan "returned" visually mutes its card and moves it to the Returned section without deleting it; the book's own detail page reflects both "still out" and "returned" states correctly under "Lent out".
-- [ ] A loan lent 30+ days ago and not yet returned shows in the "Overdue" section with an "Overdue" pill, AND makes the Lent tab's bottom-bar icon show a red dot even while the user is on a different tab.
-- [ ] Tapping "Surprise me" with an empty to-read pile shows a friendly notice and does not open the popup; with books available, it opens a popup (not a navigation) showing a random pick; "Try again" swaps to a different book when more than one is available; "Start reading" marks it reading and closes without navigating to its detail page; the ✕ icon closes without changing anything.
+- [ ] A loan lent 30+ days ago and not yet returned shows in the "Overdue" section with an "Overdue" pill, AND makes the Lent tab's bottom-bar icon show a red dot even while the user is on a different tab. The Lent tab also shows a live "N books currently lent out" count, computed from all active loans regardless of the current search/quick-filter.
+- [ ] Tapping "Choose a book to read" with an empty TBR pile shows a friendly notice and does not open the popup; with books available, it opens a popup (not a navigation) showing a random pick; "Try again" swaps to a different book when more than one is available; "Start reading" marks it reading and closes without navigating to its detail page; the ✕ icon closes without changing anything.
+- [ ] The gear icon shows a red dot, and the Settings sheet shows a matching warning banner, whenever the last successful backup is 7+ days old or has never happened; both clear immediately after a successful export, and the "Last backup: [date]" line updates in the same action.

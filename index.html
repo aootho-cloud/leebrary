@@ -847,6 +847,22 @@
     color:var(--ink);
   }
   .field select:disabled{ color:var(--ink-soft); }
+  .date-filter-row{
+    display:flex;
+    gap:8px;
+  }
+  .date-filter-row select{
+    flex:1;
+    min-width:0;
+    border:1px solid var(--line);
+    background:var(--card);
+    border-radius:10px;
+    padding:10px 8px;
+    font-family:inherit;
+    font-size:13px;
+    color:var(--ink);
+  }
+  .date-filter-row select:disabled{ color:var(--ink-soft); }
   .lend-author-preview{
     font-size:13.5px;
     color:var(--ink-soft);
@@ -1274,6 +1290,14 @@
           <button data-val="5">★5</button>
         </div>
       </div>
+      <div class="filter-section">
+        <div class="filter-section-label">Date added</div>
+        <div class="date-filter-row">
+          <select id="dateFilterYear"></select>
+          <select id="dateFilterMonth" disabled></select>
+          <select id="dateFilterDay" disabled></select>
+        </div>
+      </div>
       <div class="sheet-actions">
         <button class="btn" id="clearFiltersBtn">Clear all</button>
         <button class="btn primary" id="applyFiltersBtn">Show results</button>
@@ -1394,6 +1418,9 @@
   let statusFilters = new Set();   // 'to-read' | 'reading' | 'done'
   let ownerFilters = new Set();    // 'owned' | 'borrowed'
   let ratingFilters = new Set();   // 1-5
+  let filterYear = null;  // number or null ("any year") — filters by dateAdded
+  let filterMonth = null; // 0-11 or null ("any month") — only meaningful when filterYear is set
+  let filterDay = null;   // 1-31 or null ("any day") — only meaningful when filterMonth is set
   let searchTerm = '';
   let sortDir = 'desc'; // 'desc' = recent first, 'asc' = oldest first
   let libraryViewMode = 'list'; // 'list' | 'grid'
@@ -1535,6 +1562,15 @@
       if(!ownerFilters.has(ownKey)) return false;
     }
     if(ratingFilters.size > 0 && !ratingFilters.has(b.rating||0)) return false;
+    if(filterYear !== null){
+      if(!b.dateAdded) return false;
+      const d = new Date(b.dateAdded + 'T00:00:00');
+      if(d.getFullYear() !== filterYear) return false;
+      if(filterMonth !== null){
+        if(d.getMonth() !== filterMonth) return false;
+        if(filterDay !== null && d.getDate() !== filterDay) return false;
+      }
+    }
     return true;
   }
   function quickStatusValue(){
@@ -1546,6 +1582,7 @@
   function advancedFilterCount(){
     let n = ownerFilters.size + ratingFilters.size;
     if(statusFilters.has('reading')) n++;
+    if(filterYear !== null) n++;
     return n;
   }
   function activeSortField(){
@@ -2725,6 +2762,59 @@
   const ownerChipGroup = document.getElementById('ownerChipGroup');
   const ratingChipGroup = document.getElementById('ratingChipGroup');
   const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+  const dateFilterYear = document.getElementById('dateFilterYear');
+  const dateFilterMonth = document.getElementById('dateFilterMonth');
+  const dateFilterDay = document.getElementById('dateFilterDay');
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function yearsWithAddedBooks(){
+    const years = new Set();
+    books.forEach(b=>{
+      if(b.dateAdded) years.add(parseInt(b.dateAdded.slice(0,4),10));
+    });
+    years.add(new Date().getFullYear()); // always offer the current year, even with no books yet
+    return Array.from(years).sort((a,b)=>b-a);
+  }
+  function daysInMonth(year, month){
+    return new Date(year, month+1, 0).getDate();
+  }
+  function populateDateFilterSelects(){
+    // Year
+    let opts = `<option value="">Any year</option>`;
+    yearsWithAddedBooks().forEach(y=>{ opts += `<option value="${y}">${y}</option>`; });
+    dateFilterYear.innerHTML = opts;
+    dateFilterYear.value = filterYear === null ? '' : String(filterYear);
+    // Month — only enabled once a year is chosen
+    dateFilterMonth.disabled = (filterYear === null);
+    let mOpts = `<option value="">Any month</option>`;
+    MONTH_NAMES.forEach((name,i)=>{ mOpts += `<option value="${i}">${name}</option>`; });
+    dateFilterMonth.innerHTML = mOpts;
+    dateFilterMonth.value = filterMonth === null ? '' : String(filterMonth);
+    // Day — only enabled once a month is chosen; day count adapts to the chosen year+month
+    dateFilterDay.disabled = (filterMonth === null);
+    const dayCount = (filterYear !== null && filterMonth !== null) ? daysInMonth(filterYear, filterMonth) : 31;
+    let dOpts = `<option value="">Any day</option>`;
+    for(let d=1; d<=dayCount; d++){ dOpts += `<option value="${d}">${d}</option>`; }
+    dateFilterDay.innerHTML = dOpts;
+    dateFilterDay.value = filterDay === null ? '' : String(filterDay);
+  }
+  dateFilterYear.addEventListener('change', ()=>{
+    filterYear = dateFilterYear.value === '' ? null : parseInt(dateFilterYear.value,10);
+    filterMonth = null;
+    filterDay = null;
+    populateDateFilterSelects();
+    updateFilterChipsUI();
+  });
+  dateFilterMonth.addEventListener('change', ()=>{
+    filterMonth = dateFilterMonth.value === '' ? null : parseInt(dateFilterMonth.value,10);
+    filterDay = null;
+    populateDateFilterSelects();
+    updateFilterChipsUI();
+  });
+  dateFilterDay.addEventListener('change', ()=>{
+    filterDay = dateFilterDay.value === '' ? null : parseInt(dateFilterDay.value,10);
+    updateFilterChipsUI();
+  });
 
   function matchCountWithCurrentToggles(){
     return books.filter(b=>{
@@ -2750,6 +2840,7 @@
     applyFiltersBtn.textContent = `Show ${n} book${n===1?'':'s'}`;
   }
   function openFilters(){
+    populateDateFilterSelects();
     updateFilterChipsUI();
     filtersBackdrop.classList.add('open');
   }
@@ -2780,6 +2871,10 @@
     statusFilters.clear();
     ownerFilters.clear();
     ratingFilters.clear();
+    filterYear = null;
+    filterMonth = null;
+    filterDay = null;
+    populateDateFilterSelects();
     updateFilterChipsUI();
   });
   applyFiltersBtn.addEventListener('click', ()=>{
