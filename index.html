@@ -86,6 +86,44 @@
     font-size:11.5px;
     color:var(--ink-soft);
   }
+  .auth-screen{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:var(--paper);
+    z-index:200;
+    align-items:center;
+    justify-content:center;
+  }
+  .auth-screen.open{ display:flex; }
+  .auth-card{
+    width:100%;
+    max-width:340px;
+    padding:28px 24px;
+    box-sizing:border-box;
+  }
+  .auth-card .field{ margin-bottom:14px; }
+  .auth-error{
+    background:var(--tag-red-bg);
+    color:var(--tag-red);
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:12.5px;
+    line-height:1.4;
+    margin-bottom:14px;
+  }
+  #authToggleModeBtn{
+    background:transparent;
+    border:none;
+    color:var(--ink-soft);
+    text-decoration:underline;
+  }
+  .auth-divider{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:12px;
+    margin:16px 0;
+  }
   .header-icon-btn{
     border:1px solid var(--line);
     background:var(--card);
@@ -1162,8 +1200,30 @@
   }
   .detail-footer-actions .btn{ flex:1; text-align:center; padding:11px; }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="brand" style="justify-content:center;"><span class="script">Lee</span>brary</div>
+    <div class="tagline" style="text-align:center; margin-bottom:22px;">a library that remembers</div>
+    <div class="field">
+      <label for="authEmail">Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label for="authPassword">Password</label>
+      <input type="password" id="authPassword" placeholder="At least 6 characters" autocomplete="current-password">
+    </div>
+    <div class="auth-error" id="authError" style="display:none;"></div>
+    <button class="btn primary settings-action-btn" id="authSubmitBtn">Log in</button>
+    <button class="btn settings-action-btn" id="authToggleModeBtn">Need an account? Sign up</button>
+    <div class="auth-divider">or</div>
+    <button class="btn settings-action-btn" id="googleSignInBtn">Sign in with Google</button>
+  </div>
+</div>
 <div id="app">
 
   <header>
@@ -1291,7 +1351,7 @@
         </div>
       </div>
       <div class="filter-section">
-        <div class="filter-section-label">Date added</div>
+        <div class="filter-section-label">Date read</div>
         <div class="date-filter-row">
           <select id="dateFilterYear"></select>
           <select id="dateFilterMonth" disabled></select>
@@ -1332,7 +1392,9 @@
   <div class="sheet-backdrop" id="settingsBackdrop">
     <div class="sheet">
       <h2>Backup & restore</h2>
-      <p class="settings-desc">Your library is saved only in this browser. To use it somewhere else — another browser, or your phone as well as a computer — export a backup file here, then import it there. Importing adds any books not already in your library; it won't duplicate ones that are.</p>
+      <div class="settings-desc" id="settingsAccountLine" style="margin-bottom:14px;"></div>
+      <button class="btn settings-action-btn" id="logOutBtn" style="margin-bottom:18px;">Log out</button>
+      <p class="settings-desc">Your library syncs to your account automatically. A backup file is still useful as an extra copy, or to move data between accounts.</p>
       <div class="settings-last-backup" id="settingsLastBackup"></div>
       <div class="settings-backup-warning" id="settingsBackupWarning" style="display:none;">
         <span>⚠️</span>
@@ -1408,6 +1470,22 @@
 
 <script>
 (function(){
+  const firebaseConfig = {
+    apiKey: "AIzaSyDTCZa6AMIX2pzadjBJ_Tx6T4Wg7Gf5hM8",
+    authDomain: "leebrary-68f49.firebaseapp.com",
+    projectId: "leebrary-68f49",
+    storageBucket: "leebrary-68f49.firebasestorage.app",
+    messagingSenderId: "93110379388",
+    appId: "1:93110379388:web:31aaec33e9bca26d3f7af9"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  db.enablePersistence({ synchronizeTabs: true }).catch(()=>{ /* multiple tabs or unsupported browser — fine, just no offline cache */ });
+  let currentUser = null;
+  let cloudUnsubscribers = []; // active onSnapshot() listeners for the logged-in user, torn down on logout
+  let authMode = 'login'; // 'login' | 'signup' — which the auth screen's submit button currently does
+
   const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let books = [];
   let wishlist = []; // books the user wants to buy in the future
@@ -1418,8 +1496,8 @@
   let statusFilters = new Set();   // 'to-read' | 'reading' | 'done'
   let ownerFilters = new Set();    // 'owned' | 'borrowed'
   let ratingFilters = new Set();   // 1-5
-  let filterYear = null;  // number or null ("any year") — filters by dateAdded
-  let filterMonth = null; // 0-11 or null ("any month") — only meaningful when filterYear is set
+  let filterYear = null;  // number or null ("any year") — filters by read date (getReadDates), TBR/Reading only ever match the current year
+  let filterMonth = null; // 0-11 or null ("any month") — only meaningful when filterYear is set; never matches TBR/Reading (their read date is unknown)
   let filterDay = null;   // 1-31 or null ("any day") — only meaningful when filterMonth is set
   let searchTerm = '';
   let sortDir = 'desc'; // 'desc' = recent first, 'asc' = oldest first
@@ -1521,6 +1599,11 @@
     }catch(e){
       console.error('Could not save', e);
     }
+    if(currentUser){
+      try{
+        await db.collection('users').doc(currentUser.uid).collection('library').doc('books').set({ books });
+      }catch(e){ console.error('Cloud save (books) failed', e); }
+    }
   }
   async function loadWishlist(){
     try{
@@ -1535,6 +1618,11 @@
       localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(wishlist));
     }catch(e){
       console.error('Could not save', e);
+    }
+    if(currentUser){
+      try{
+        await db.collection('users').doc(currentUser.uid).collection('library').doc('wishlist').set({ wishlist });
+      }catch(e){ console.error('Cloud save (wishlist) failed', e); }
     }
   }
   const LOANS_STORAGE_KEY = 'leebrary_loans_v1';
@@ -1552,7 +1640,135 @@
     }catch(e){
       console.error('Could not save', e);
     }
+    if(currentUser){
+      try{
+        await db.collection('users').doc(currentUser.uid).collection('library').doc('loans').set({ loans });
+      }catch(e){ console.error('Cloud save (loans) failed', e); }
+    }
   }
+
+  // ---------- Cloud sync (Firebase Auth + Firestore) ----------
+  // Each signed-in user's data lives at users/{uid}/library/{books|wishlist|loans},
+  // one document per array (simple and cheap to keep in sync; fine for a personal
+  // library's size/cover-image weight — see the PRD for the size trade-off this implies).
+  function attachCloudListeners(uid){
+    detachCloudListeners();
+    const libRef = db.collection('users').doc(uid).collection('library');
+    cloudUnsubscribers.push(libRef.doc('books').onSnapshot(snap=>{
+      books = (snap.exists && Array.isArray(snap.data().books)) ? snap.data().books : [];
+      renderMain();
+    }, e=> console.error('books listener error', e)));
+    cloudUnsubscribers.push(libRef.doc('wishlist').onSnapshot(snap=>{
+      wishlist = (snap.exists && Array.isArray(snap.data().wishlist)) ? snap.data().wishlist : [];
+      renderMain();
+    }, e=> console.error('wishlist listener error', e)));
+    cloudUnsubscribers.push(libRef.doc('loans').onSnapshot(snap=>{
+      loans = (snap.exists && Array.isArray(snap.data().loans)) ? snap.data().loans : [];
+      renderMain();
+    }, e=> console.error('loans listener error', e)));
+  }
+  function detachCloudListeners(){
+    cloudUnsubscribers.forEach(unsub=>unsub());
+    cloudUnsubscribers = [];
+  }
+
+  // One-time offer, right after a fresh login, to upload whatever's already saved
+  // locally on this device/browser into the (currently empty) cloud account — so
+  // switching to an account doesn't strand data that predates it.
+  async function maybeOfferLocalMigration(uid){
+    const libRef = db.collection('users').doc(uid).collection('library');
+    const booksDoc = await libRef.doc('books').get();
+    const cloudHasBooks = booksDoc.exists && Array.isArray(booksDoc.data().books) && booksDoc.data().books.length > 0;
+    await loadBooks(); await loadWishlist(); await loadLoans(); // read whatever's local, without touching the live `books`/etc used on screen
+    const localBooks = books, localWishlist = wishlist, localLoans = loans;
+    if(!cloudHasBooks && localBooks.length > 0){
+      showConfirm(
+        `Found ${localBooks.length} book${localBooks.length===1?'':'s'} already saved on this device. Upload them to your account?`,
+        { confirmLabel:'Upload', onConfirm: async ()=>{
+          await libRef.doc('books').set({ books: localBooks });
+          await libRef.doc('wishlist').set({ wishlist: localWishlist });
+          await libRef.doc('loans').set({ loans: localLoans });
+        }}
+      );
+    }
+  }
+
+  function showAuthScreen(){
+    document.getElementById('authScreen').classList.add('open');
+  }
+  function hideAuthScreen(){
+    document.getElementById('authScreen').classList.remove('open');
+  }
+  function setAuthError(msg){
+    const el = document.getElementById('authError');
+    if(!msg){ el.style.display = 'none'; el.textContent = ''; return; }
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+  function updateAuthModeUI(){
+    document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? 'Log in' : 'Sign up';
+    document.getElementById('authToggleModeBtn').textContent = authMode === 'login' ? 'Need an account? Sign up' : 'Already have an account? Log in';
+  }
+  document.getElementById('authToggleModeBtn').addEventListener('click', ()=>{
+    authMode = authMode === 'login' ? 'signup' : 'login';
+    setAuthError(null);
+    updateAuthModeUI();
+  });
+  document.getElementById('authSubmitBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    if(!email || !password){ setAuthError('Enter an email and password.'); return; }
+    setAuthError(null);
+    try{
+      if(authMode === 'login'){
+        await auth.signInWithEmailAndPassword(email, password);
+      } else {
+        await auth.createUserWithEmailAndPassword(email, password);
+      }
+    }catch(e){
+      setAuthError(e.message || 'Something went wrong — try again.');
+    }
+  });
+
+  // Google sign-in uses the REDIRECT flow, not a popup — popups are unreliable
+  // inside an installed/standalone PWA on many phones, while bouncing to Google's
+  // page and back works consistently everywhere the app is opened.
+  document.getElementById('googleSignInBtn').addEventListener('click', ()=>{
+    setAuthError(null);
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithRedirect(provider);
+  });
+  auth.getRedirectResult().catch(e=>{
+    setAuthError(e.message || 'Google sign-in failed — try again.');
+  });
+  updateAuthModeUI();
+
+  document.getElementById('logOutBtn').addEventListener('click', ()=>{
+    showConfirm('Log out of your account?', {
+      confirmLabel: 'Log out',
+      onConfirm: ()=>{ auth.signOut(); }
+    });
+  });
+
+  auth.onAuthStateChanged(async (user)=>{
+    currentUser = user;
+    if(user){
+      hideAuthScreen();
+      const acctLine = document.getElementById('settingsAccountLine');
+      if(acctLine) acctLine.textContent = `Logged in as ${user.email}`;
+      attachCloudListeners(user.uid);
+      await maybeOfferLocalMigration(user.uid);
+    } else {
+      detachCloudListeners();
+      books = []; wishlist = []; loans = [];
+      document.getElementById('authEmail').value = '';
+      document.getElementById('authPassword').value = '';
+      setAuthError(null);
+      showAuthScreen();
+      renderMain();
+    }
+  });
+
 
   // ---------- Rendering: Library ----------
   function bookMatchesFilters(b){
@@ -1562,14 +1778,35 @@
       if(!ownerFilters.has(ownKey)) return false;
     }
     if(ratingFilters.size > 0 && !ratingFilters.has(b.rating||0)) return false;
-    if(filterYear !== null){
-      if(!b.dateAdded) return false;
-      const d = new Date(b.dateAdded + 'T00:00:00');
-      if(d.getFullYear() !== filterYear) return false;
-      if(filterMonth !== null){
-        if(d.getMonth() !== filterMonth) return false;
-        if(filterDay !== null && d.getDate() !== filterDay) return false;
-      }
+    if(filterYear !== null && !bookMatchesDateFilter(b)) return false;
+    return true;
+  }
+  // The Date read filter (Filters sheet, "Date read" section) checks against when a
+  // book was actually READ, not when it was added — mirroring the same logic the
+  // Library's month-grouping already uses (section 7.5 in the PRD): a book that's
+  // still to-read/reading has no read date at all, so it only ever "belongs" to the
+  // current real-world year — it can never match a past year. A done book matches
+  // whichever year(s)/month/day its most recent completion actually falls on.
+  function bookMatchesDateFilter(b){
+    const currentYear = new Date().getFullYear();
+    if(b.status !== 'done'){
+      // TBR/Reading books: only the plain "this year" filter can ever match them —
+      // narrowing to a specific month or day never matches, since there is no real
+      // read date to check against.
+      return filterYear === currentYear && filterMonth === null && filterDay === null;
+    }
+    const dates = getReadDates(b);
+    if(!dates.length) return false;
+    const last = dates[dates.length-1];
+    const isApproxCompletion = b.dateFinishedApprox && last === b.dateFinished;
+    const d = new Date(last + 'T00:00:00');
+    if(d.getFullYear() !== filterYear) return false;
+    if(filterMonth !== null){
+      // An approximate (year-only) completion can't be confirmed against a specific
+      // month/day — treat it as not matching rather than guessing from the placeholder date.
+      if(isApproxCompletion) return false;
+      if(d.getMonth() !== filterMonth) return false;
+      if(filterDay !== null && d.getDate() !== filterDay) return false;
     }
     return true;
   }
@@ -1628,6 +1865,11 @@
     return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
   }
   function monthKeyLabel(key){
+    if(!key.includes('-')){
+      // Year-only key: a book whose only known completion info is the year
+      // (an approximate "not sure of the exact date" entry) — no month to show.
+      return key;
+    }
     const [y, m] = key.split('-').map(Number);
     return new Date(y, m-1, 1).toLocaleDateString(undefined, {month:'long', year:'numeric'});
   }
@@ -1639,7 +1881,15 @@
     if(b.status === 'done'){
       const dates = getReadDates(b);
       const last = dates.length ? dates[dates.length-1] : '';
-      if(last) return last.slice(0, 7);
+      if(last){
+        // If the most recent completion is this book's approximate one (only a year
+        // was ever chosen, no real month), group it under just that year instead of
+        // the arbitrary placeholder month baked into the stored date.
+        if(b.dateFinishedApprox && last === b.dateFinished){
+          return String(b.dateFinishedApproxYear);
+        }
+        return last.slice(0, 7);
+      }
     }
     return nowMonthKey();
   }
@@ -2767,21 +3017,22 @@
   const dateFilterDay = document.getElementById('dateFilterDay');
   const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-  function yearsWithAddedBooks(){
-    const years = new Set();
-    books.forEach(b=>{
-      if(b.dateAdded) years.add(parseInt(b.dateAdded.slice(0,4),10));
-    });
-    years.add(new Date().getFullYear()); // always offer the current year, even with no books yet
-    return Array.from(years).sort((a,b)=>b-a);
+  const DATE_FILTER_START_YEAR = 2020;
+  function dateFilterYearOptions(){
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for(let y=currentYear; y>=DATE_FILTER_START_YEAR; y--){ years.push(y); }
+    return years;
   }
   function daysInMonth(year, month){
     return new Date(year, month+1, 0).getDate();
   }
   function populateDateFilterSelects(){
-    // Year
+    // Year — a fixed range (2020 through the current real-world year), not derived
+    // from whatever years happen to be present in the data, so the full range is
+    // always available even on a near-empty library.
     let opts = `<option value="">Any year</option>`;
-    yearsWithAddedBooks().forEach(y=>{ opts += `<option value="${y}">${y}</option>`; });
+    dateFilterYearOptions().forEach(y=>{ opts += `<option value="${y}">${y}</option>`; });
     dateFilterYear.innerHTML = opts;
     dateFilterYear.value = filterYear === null ? '' : String(filterYear);
     // Month — only enabled once a year is chosen
@@ -3318,9 +3569,9 @@
 
   // ---------- Init ----------
   (async function init(){
-    await loadBooks();
-    await loadWishlist();
-    await loadLoans();
+    // Loading books/wishlist/loans is now driven entirely by auth.onAuthStateChanged
+    // above (Firestore listeners when logged in, the auth gate when not) — nothing
+    // to load here before the first render.
     renderMain();
     updateSettingsDot();
     setupHomeScreenManifest();
