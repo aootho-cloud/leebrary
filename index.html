@@ -1803,6 +1803,26 @@
   let authMode = 'login'; // 'login' | 'signup' — which the auth screen's submit button currently does
 
   const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Cover images are kept OUT of the main `books` Firestore document and synced one
+  // document per book instead (users/{uid}/covers/{bookId}). A single Firestore
+  // document is capped at 1MiB; bundling every cover into one array-in-a-doc means
+  // the whole library eventually stops saving to the cloud once accumulated cover
+  // data crosses that ceiling — silently, since the write just threw and was being
+  // swallowed. Splitting one-doc-per-cover means the ceiling is per-book (a single
+  // resized cover is nowhere near 1MiB), so it no longer grows with library size.
+  // `booksMeta` holds the metadata array as last received from Firestore's `books`
+  // doc (no `cover` field once resaved under this scheme); `bookCoverMap` holds
+  // id -> cover data-URI as last received from the `covers` collection listener.
+  // `books` (below) is always the two merged together, and is what the rest of the
+  // app reads/renders from — nothing else needs to know about the split.
+  let booksMeta = [];
+  let bookCoverMap = {};
+  function recomputeBooksFromMetaAndCovers(){
+    books = booksMeta.map(b => ({
+      ...b,
+      cover: Object.prototype.hasOwnProperty.call(bookCoverMap, b.id) ? bookCoverMap[b.id] : (b.cover ?? null)
+    }));
+  }
   let books = [];
   let wishlist = []; // books the user wants to buy in the future
   let loans = []; // books the user has lent out to other people
@@ -1992,11 +2012,34 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
     }catch(e){
       console.error('Could not save', e);
+      showToast('Could not save locally — device storage may be full');
     }
     if(currentUser){
       try{
-        await db.collection('users').doc(currentUser.uid).collection('library').doc('books').set({ books });
-      }catch(e){ console.error('Cloud save (books) failed', e); }
+        // Strip cover data out of what goes into the single `books` doc — covers are
+        // synced separately, one Firestore document per book (see syncBookCover), so
+        // this doc stays small no matter how large the library grows.
+        const slimBooks = books.map(({cover, ...rest})=>rest);
+        await db.collection('users').doc(currentUser.uid).collection('library').doc('books').set({ books: slimBooks });
+      }catch(e){
+        console.error('Cloud save (books) failed', e);
+        showToast('Could not sync your library to the cloud');
+      }
+    }
+  }
+  // Syncs a single book's cover to its own Firestore document, independent of the
+  // main books list. Pass a falsy dataUri to remove the cover doc (book deleted, or
+  // its cover was removed). Kept separate from saveBooks() so a save that doesn't
+  // touch any cover never has to touch the covers collection at all.
+  async function syncBookCover(bookId, dataUri){
+    if(!currentUser) return;
+    try{
+      const ref = db.collection('users').doc(currentUser.uid).collection('covers').doc(bookId);
+      if(dataUri) await ref.set({ cover: dataUri });
+      else await ref.delete();
+    }catch(e){
+      console.error('Cloud save (cover) failed', e);
+      showToast('Could not sync that cover image to the cloud');
     }
   }
   async function loadWishlist(){
@@ -2050,9 +2093,20 @@
     detachCloudListeners();
     const libRef = db.collection('users').doc(uid).collection('library');
     cloudUnsubscribers.push(libRef.doc('books').onSnapshot(snap=>{
-      books = (snap.exists && Array.isArray(snap.data().books)) ? snap.data().books : [];
+      booksMeta = (snap.exists && Array.isArray(snap.data().books)) ? snap.data().books : [];
+      recomputeBooksFromMetaAndCovers();
       renderMain();
     }, e=> console.error('books listener error', e)));
+    // Covers live in their own collection, one document per book (see syncBookCover).
+    // This listener rebuilds the id -> cover map whenever any cover doc changes, then
+    // re-merges it onto the current metadata so `books` stays up to date either way.
+    cloudUnsubscribers.push(db.collection('users').doc(uid).collection('covers').onSnapshot(snap=>{
+      const map = {};
+      snap.forEach(doc=>{ map[doc.id] = doc.data().cover || null; });
+      bookCoverMap = map;
+      recomputeBooksFromMetaAndCovers();
+      renderMain();
+    }, e=> console.error('covers listener error', e)));
     cloudUnsubscribers.push(libRef.doc('wishlist').onSnapshot(snap=>{
       wishlist = (snap.exists && Array.isArray(snap.data().wishlist)) ? snap.data().wishlist : [];
       renderMain();
@@ -2119,7 +2173,16 @@
       showConfirm(
         `Found ${parts.join(', ')} already saved on this device. Upload them to your account?`,
         { confirmLabel:'Upload', onConfirm: async ()=>{
-          if(needsBooks) await libRef.doc('books').set({ books: localBooks });
+          if(needsBooks){
+            // Same split as saveBooks(): slim metadata in the one `books` doc, each
+            // cover in its own doc, so a device with a big local library can't blow
+            // past the 1MiB per-document ceiling on upload either.
+            const slimBooks = localBooks.map(({cover, ...rest})=>rest);
+            await libRef.doc('books').set({ books: slimBooks });
+            await Promise.all(localBooks
+              .filter(b=>b.cover)
+              .map(b=> db.collection('users').doc(uid).collection('covers').doc(b.id).set({ cover: b.cover })));
+          }
           if(needsWishlist) await libRef.doc('wishlist').set({ wishlist: localWishlist });
           if(needsLoans) await libRef.doc('loans').set({ loans: localLoans });
         }}
@@ -2524,6 +2587,7 @@
     } else {
       detachCloudListeners();
       books = []; wishlist = []; loans = [];
+      booksMeta = []; bookCoverMap = {};
       profilePhotoDataUri = null;
       document.getElementById('authEmail').value = '';
       document.getElementById('authPassword').value = '';
@@ -2958,6 +3022,7 @@
             onConfirm: ()=>{
               books = books.filter(x=>x.id!==book.id);
               saveBooks();
+              syncBookCover(book.id, null); // clean up its cover doc so it doesn't linger in the cloud
               view = currentTab;
               renderMain();
               showToast('Book removed');
@@ -3655,6 +3720,7 @@
       ? `${approxYear}-07-02`
       : (document.getElementById('fFinished').value || todayStr());
 
+    let savedBookId = editingId;
     if(editingId){
       const book = books.find(x=>x.id===editingId);
       if(book){
@@ -3686,8 +3752,9 @@
       }
       view = 'detail';
     } else {
+      savedBookId = uid();
       books.push({
-        id: uid(),
+        id: savedBookId,
         title,
         author,
         status: formStatus,
@@ -3704,6 +3771,7 @@
       view = currentTab;
     }
     saveBooks();
+    syncBookCover(savedBookId, formCover);
     closeSheet();
     renderMain();
     showToast(editingId ? 'Book updated' : 'Book added');
@@ -4405,6 +4473,10 @@
           saveBooks();
           saveWishlist();
           saveLoans();
+          // Each imported book's cover gets its own doc too (see syncBookCover) —
+          // otherwise a restored backup with lots of covers could hit the same
+          // 1MiB-per-doc ceiling this fix exists to avoid.
+          newBooks.filter(b=>b.cover).forEach(b=> syncBookCover(b.id, b.cover));
           if(incomingProfile && currentUser){
             try{
               if(typeof incomingProfile.displayName === 'string' && incomingProfile.displayName){
