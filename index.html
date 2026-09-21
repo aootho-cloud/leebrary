@@ -2016,6 +2016,17 @@
     }
     if(currentUser){
       try{
+        // Safety net: never strip a cover out of the metadata doc unless it's
+        // already confirmed synced to its own cover doc first. Without this, a
+        // save can permanently erase a cover that never made it into the covers
+        // collection — which is exactly what happened the first time this split
+        // shipped: existing libraries had covers stripped from the metadata doc
+        // before those covers had anywhere else to live yet.
+        const unsynced = books.filter(b=> b.cover && bookCoverMap[b.id] !== b.cover);
+        if(unsynced.length){
+          await Promise.all(unsynced.map(b=> syncBookCover(b.id, b.cover)));
+          unsynced.forEach(b=> bookCoverMap[b.id] = b.cover);
+        }
         // Strip cover data out of what goes into the single `books` doc — covers are
         // synced separately, one Firestore document per book (see syncBookCover), so
         // this doc stays small no matter how large the library grows.
@@ -2577,12 +2588,54 @@
     }
   });
 
+  // One-time-per-login recovery pass. Covers a book can be missing its own cover
+  // doc for two reasons: (a) it's an older book that predates the covers-collection
+  // split entirely, or (b) it's a book whose cover got stripped from the metadata
+  // doc by a save that ran before this recovery existed (the bug this function
+  // fixes). Either way, the fix is the same: find any cover still available from
+  // a source we haven't lost yet, and give it its own doc.
+  //   Source 1 — the live `books` doc, in case a cover is still sitting there
+  //   inline and just hasn't been stripped by a save yet.
+  //   Source 2 — this device's localStorage cache, which keeps the full `books`
+  //   array (covers included) and is only overwritten by a *subsequent* saveBooks()
+  //   call on this same device — so if no save has run here since a cover went
+  //   missing from the cloud, it's often still sitting in this local cache.
+  async function recoverMissingCovers(uid){
+    try{
+      const coversRef = db.collection('users').doc(uid).collection('covers');
+      const [coversSnap, booksDoc] = await Promise.all([
+        coversRef.get(),
+        db.collection('users').doc(uid).collection('library').doc('books').get()
+      ]);
+      const existingIds = new Set(coversSnap.docs.map(d=>d.id));
+      const cloudBooks = (booksDoc.exists && Array.isArray(booksDoc.data().books)) ? booksDoc.data().books : [];
+      let localBooks = [];
+      try{ localBooks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }catch(e){}
+
+      const recovered = new Map(); // bookId -> cover data-URI
+      cloudBooks.forEach(b=>{ if(b && b.id && b.cover && !existingIds.has(b.id)) recovered.set(b.id, b.cover); });
+      localBooks.forEach(b=>{ if(b && b.id && b.cover && !existingIds.has(b.id) && !recovered.has(b.id)) recovered.set(b.id, b.cover); });
+
+      if(recovered.size === 0) return;
+      await Promise.all([...recovered.entries()].map(([id, cover])=>{
+        bookCoverMap[id] = cover;
+        return coversRef.doc(id).set({ cover });
+      }));
+      recomputeBooksFromMetaAndCovers();
+      renderMain();
+      showToast(`Restored ${recovered.size} cover image${recovered.size===1?'':'s'}`);
+    }catch(e){
+      console.error('Cover recovery failed', e);
+    }
+  }
+
   auth.onAuthStateChanged(async (user)=>{
     currentUser = user;
     if(user){
       hideAuthScreen();
       updateProfileHeaderUI(user);
       attachCloudListeners(user.uid);
+      await recoverMissingCovers(user.uid);
       await maybeOfferLocalMigration(user.uid);
     } else {
       detachCloudListeners();
