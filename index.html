@@ -2016,22 +2016,31 @@
     }
     if(currentUser){
       try{
-        // Safety net: never strip a cover out of the metadata doc unless it's
-        // already confirmed synced to its own cover doc first. Without this, a
-        // save can permanently erase a cover that never made it into the covers
-        // collection — which is exactly what happened the first time this split
-        // shipped: existing libraries had covers stripped from the metadata doc
-        // before those covers had anywhere else to live yet.
-        const unsynced = books.filter(b=> b.cover && bookCoverMap[b.id] !== b.cover);
-        if(unsynced.length){
-          await Promise.all(unsynced.map(b=> syncBookCover(b.id, b.cover)));
-          unsynced.forEach(b=> bookCoverMap[b.id] = b.cover);
-        }
-        // Strip cover data out of what goes into the single `books` doc — covers are
-        // synced separately, one Firestore document per book (see syncBookCover), so
-        // this doc stays small no matter how large the library grows.
+        // Snapshot cover data up front, before any Firestore call — `books` and
+        // `bookCoverMap` are live globals that the cloud listeners can reassign
+        // mid-flight (as soon as any write below echoes back), so we don't want the
+        // rest of this function reading them again after an await.
+        const coverPairs = books.filter(b=> b.cover).map(b=> [b.id, b.cover]);
         const slimBooks = books.map(({cover, ...rest})=>rest);
+
+        // Write the metadata doc FIRST. This is what makes a brand-new (or just-
+        // edited) book show up in `booksMeta`. Syncing its cover before this would
+        // let the covers-collection listener fire first and recompute `books` from
+        // a `booksMeta` that doesn't have the new book yet — which is exactly what
+        // made a freshly added book (with a cover) vanish right after the "Book
+        // added" toast: covers were being synced, and thus echoed back, before the
+        // book itself was confirmed in the metadata doc.
         await db.collection('users').doc(currentUser.uid).collection('library').doc('books').set({ books: slimBooks });
+
+        // Then confirm every cover is backed up in its own doc — a safety net so a
+        // cover can never be left stripped from the metadata doc without a copy
+        // living anywhere else (this is what caused covers to be lost outright the
+        // first time this split shipped, for books that predated it).
+        const unsynced = coverPairs.filter(([id, cover])=> bookCoverMap[id] !== cover);
+        if(unsynced.length){
+          await Promise.all(unsynced.map(([id, cover])=> syncBookCover(id, cover)));
+          unsynced.forEach(([id, cover])=> bookCoverMap[id] = cover);
+        }
       }catch(e){
         console.error('Cloud save (books) failed', e);
         showToast('Could not sync your library to the cloud');
@@ -3773,7 +3782,6 @@
       ? `${approxYear}-07-02`
       : (document.getElementById('fFinished').value || todayStr());
 
-    let savedBookId = editingId;
     if(editingId){
       const book = books.find(x=>x.id===editingId);
       if(book){
@@ -3805,9 +3813,8 @@
       }
       view = 'detail';
     } else {
-      savedBookId = uid();
       books.push({
-        id: savedBookId,
+        id: uid(),
         title,
         author,
         status: formStatus,
@@ -3823,8 +3830,12 @@
       });
       view = currentTab;
     }
+    // saveBooks() now handles syncing this book's cover itself, in the right order
+    // (metadata confirmed in the cloud before the cover echo can race it) — a
+    // separate, unordered syncBookCover() call here used to be able to complete and
+    // echo back before saveBooks()'s own write did, which is what made a freshly
+    // added book (with a cover) disappear right after the "Book added" toast.
     saveBooks();
-    syncBookCover(savedBookId, formCover);
     closeSheet();
     renderMain();
     showToast(editingId ? 'Book updated' : 'Book added');
@@ -4523,13 +4534,13 @@
           newBooks.forEach(b=> books.push(b));
           newWish.forEach(w=> wishlist.push(w));
           newLoans.forEach(l=> loans.push(l));
+          // saveBooks() already syncs every book's cover to its own doc, in the
+          // right order (metadata confirmed before covers) — no need for a separate
+          // call here, and a separate unordered one previously risked the same
+          // vanish-after-import race that a fresh add could hit.
           saveBooks();
           saveWishlist();
           saveLoans();
-          // Each imported book's cover gets its own doc too (see syncBookCover) —
-          // otherwise a restored backup with lots of covers could hit the same
-          // 1MiB-per-doc ceiling this fix exists to avoid.
-          newBooks.filter(b=>b.cover).forEach(b=> syncBookCover(b.id, b.cover));
           if(incomingProfile && currentUser){
             try{
               if(typeof incomingProfile.displayName === 'string' && incomingProfile.displayName){
